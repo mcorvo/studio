@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, ChangeEvent, useCallback } from 'react';
+import { useState, useMemo, ChangeEvent, useCallback, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { NextPage } from 'next';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Upload, Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon } from 'lucide-react';
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
   key: string;
   direction: SortDirection;
+}
+
+interface EditingCell {
+  rowIndex: number;
+  headerKey: string;
 }
 
 // Helper to get all unique keys from an array of objects
@@ -53,6 +58,8 @@ const JsonTableViewerPage: NextPage = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [currentEditValue, setCurrentEditValue] = useState<string>('');
 
   const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -61,6 +68,7 @@ const JsonTableViewerPage: NextPage = () => {
       setError(null);
       setSuccessMessage(null);
       setFileName(file.name);
+      setEditingCell(null); // Clear editing state
       try {
         const text = await file.text();
         setJsonInput(text);
@@ -83,6 +91,7 @@ const JsonTableViewerPage: NextPage = () => {
     setTableData(null);
     setTableHeaders([]);
     setSortConfig(null);
+    setEditingCell(null); // Clear editing state
 
     if (!jsonInput.trim()) {
       setError("JSON input is empty.");
@@ -149,6 +158,7 @@ const JsonTableViewerPage: NextPage = () => {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+    setEditingCell(null); // Exit edit mode if sorting
   };
   
   const escapeCsvCell = (cellData: any): string => {
@@ -165,6 +175,7 @@ const JsonTableViewerPage: NextPage = () => {
       return;
     }
     setError(null);
+    setEditingCell(null); // Exit edit mode
 
     try {
       const csvHeader = tableHeaders.map(escapeCsvCell).join(',');
@@ -190,11 +201,76 @@ const JsonTableViewerPage: NextPage = () => {
     }
   }, [sortedTableData, tableHeaders, fileName]);
 
+  const handleSaveEdit = useCallback(() => {
+    if (!editingCell || !tableData) return;
+
+    const { rowIndex, headerKey } = editingCell;
+    const newData = [...tableData];
+    const currentItem = newData[rowIndex];
+    // Ensure currentItem is an object before trying to spread it or assign to its keys
+    if (typeof currentItem !== 'object' || currentItem === null) {
+        console.error("Cannot edit item, it's not an object:", currentItem);
+        setEditingCell(null);
+        return;
+    }
+    const originalValue = currentItem[headerKey];
+    let parsedNewValue: any = currentEditValue;
+
+    try {
+      if (currentEditValue.trim() === "") { // Handle empty string input
+        parsedNewValue = (originalValue === null || typeof originalValue === 'string') ? "" : null;
+      } else if (typeof originalValue === 'number' && !isNaN(Number(currentEditValue))) {
+        parsedNewValue = Number(currentEditValue);
+      } else if (typeof originalValue === 'boolean') {
+        if (currentEditValue.toLowerCase() === 'true') parsedNewValue = true;
+        else if (currentEditValue.toLowerCase() === 'false') parsedNewValue = false;
+        // else keep as string if not clearly boolean
+      } else if ((typeof originalValue === 'object' && originalValue !== null) || 
+                 (currentEditValue.startsWith('{') && currentEditValue.endsWith('}')) || 
+                 (currentEditValue.startsWith('[') && currentEditValue.endsWith(']'))) {
+        parsedNewValue = JSON.parse(currentEditValue);
+      }
+      // Default: keep as string (parsedNewValue is already currentEditValue)
+    } catch (e) {
+      // If JSON.parse fails or other conversion error, keep currentEditValue as string
+      // A toast could be added here for parse errors if desired.
+      console.warn(`Failed to parse '${currentEditValue}' for cell [${rowIndex}, ${headerKey}]. Saving as string.`);
+    }
+    
+    newData[rowIndex] = { ...currentItem, [headerKey]: parsedNewValue };
+    setTableData(newData);
+    setEditingCell(null);
+  }, [editingCell, currentEditValue, tableData]);
+
+  const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault(); // Prevent form submission if wrapped in one
+      handleSaveEdit();
+    } else if (event.key === 'Escape') {
+      setEditingCell(null); // Cancel edit
+    }
+  };
+
+  const handleCellClick = (rowIndex: number, headerKey: string) => {
+    if (isLoading) return; // Prevent editing while loading
+    // If already editing this cell, do nothing to allow normal input interaction
+    if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
+      return;
+    }
+    // If editing another cell, save it first
+    if (editingCell) {
+      handleSaveEdit();
+    }
+    setEditingCell({ rowIndex, headerKey });
+    setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
+  };
+
+
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
       <header className="mb-8 text-center">
         <h1 className="text-4xl font-headline font-bold text-primary">JSON Table Viewer</h1>
-        <p className="text-muted-foreground mt-2">Upload or paste JSON to view as a sortable table and export to CSV.</p>
+        <p className="text-muted-foreground mt-2">Upload or paste JSON to view, edit, and export data.</p>
       </header>
 
       <Card className="mb-8 shadow-lg rounded-xl">
@@ -203,7 +279,7 @@ const JsonTableViewerPage: NextPage = () => {
             <FileJsonIcon className="text-primary w-7 h-7" />
             Input JSON Data
           </CardTitle>
-          <CardDescription>Upload a .json file or paste content into the text area.</CardDescription>
+          <CardDescription>Upload a .json file or paste content. Edit data directly in the table below.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -225,7 +301,7 @@ const JsonTableViewerPage: NextPage = () => {
             <Textarea
               id="json-textarea"
               value={jsonInput}
-              onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); }}
+              onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
               placeholder='e.g., [{"id": 1, "name": "Example"}, {"id": 2, "name": "Data"}]'
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
@@ -275,7 +351,7 @@ const JsonTableViewerPage: NextPage = () => {
           <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <CardTitle className="text-2xl font-headline">Data Table</CardTitle>
-              <CardDescription>View and sort your JSON data. Click column headers to sort.</CardDescription>
+              <CardDescription>View and sort your JSON data. Click a cell to edit its content. Click column headers to sort.</CardDescription>
             </div>
             <Button 
               onClick={exportToCsv}
@@ -297,17 +373,17 @@ const JsonTableViewerPage: NextPage = () => {
                 <TableCaption className="py-4">{fileName ? `Data from ${fileName}` : (jsonInput ? 'Pasted JSON data' : 'No data source')}. {sortedTableData.length > 0 ? `Found ${sortedTableData.length} rows.` : ''}</TableCaption>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    {tableHeaders.map((header) => (
+                    {tableHeaders.map((headerKey) => (
                       <TableHead 
-                        key={header} 
-                        onClick={() => requestSort(header)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === header ? 'bg-muted text-primary' : ''}`}
-                        aria-sort={sortConfig?.key === header ? sortConfig.direction : 'none'}
-                        title={`Sort by ${header}`}
+                        key={headerKey} 
+                        onClick={() => requestSort(headerKey)}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''}`}
+                        aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
+                        title={`Sort by ${headerKey}`}
                       >
                         <div className="flex items-center gap-1">
-                          {header}
-                          {sortConfig?.key === header ? (
+                          {headerKey}
+                          {sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
                             <ArrowUpDown className="h-4 w-4 opacity-30" />
@@ -320,9 +396,34 @@ const JsonTableViewerPage: NextPage = () => {
                 <TableBody>
                   {sortedTableData.map((row, rowIndex) => (
                     <TableRow key={rowIndex} className="hover:bg-muted/20 transition-colors data-[state=selected]:bg-muted">
-                      {tableHeaders.map((header, cellIndex) => (
-                        <TableCell key={`${rowIndex}-${cellIndex}`} className="p-3 text-sm max-w-[250px] truncate" title={getDisplayValue(row[header])}>
-                          {getDisplayValue(row[header])}
+                      {tableHeaders.map((headerKey) => (
+                        <TableCell 
+                          key={`${rowIndex}-${headerKey}`} 
+                          className="p-0 text-sm relative" /* p-0 allows input to fill cell */
+                          onClickCapture={(e) => { 
+                            // If click target is already the input, don't re-trigger cell click
+                            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+                            handleCellClick(rowIndex, headerKey);
+                          }}
+                        >
+                          {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
+                            <Input
+                              type="text"
+                              value={currentEditValue}
+                              onChange={(e) => setCurrentEditValue(e.target.value)}
+                              onBlurCapture={handleSaveEdit} // Use onBlurCapture to ensure it fires before potential parent onClick
+                              onKeyDown={handleEditKeyDown}
+                              autoFocus
+                              className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
+                            />
+                          ) : (
+                            <div 
+                              className="p-3 truncate cursor-pointer hover:bg-muted/30 w-full h-full box-border min-h-[2.5rem] flex items-center" /* min-h to match input */
+                              title={getDisplayValue(row[headerKey])}
+                            >
+                              {getDisplayValue(row[headerKey])}
+                            </div>
+                          )}
                         </TableCell>
                       ))}
                     </TableRow>
