@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle } from 'lucide-react';
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -88,13 +88,14 @@ const JsonTableViewerPage: NextPage = () => {
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
-    setTableData(null);
-    setTableHeaders([]);
+    // Do not reset tableData and tableHeaders here, let success/error paths handle it.
     setSortConfig(null);
     setEditingCell(null); // Clear editing state
 
     if (!jsonInput.trim()) {
       setError("JSON input is empty.");
+      setTableData(null); // Reset table data
+      setTableHeaders([]); // Reset headers
       setIsLoading(false);
       return;
     }
@@ -115,7 +116,7 @@ const JsonTableViewerPage: NextPage = () => {
 
       if (dataArray.length === 0) {
         setTableData([]);
-        setTableHeaders([]);
+        setTableHeaders(getAllKeys(dataArray)); // Will be [] if dataArray is truly empty of objects
         setSuccessMessage("JSON processed. The array is empty.");
         setIsLoading(false);
         return;
@@ -207,7 +208,7 @@ const JsonTableViewerPage: NextPage = () => {
     const { rowIndex, headerKey } = editingCell;
     const newData = [...tableData];
     const currentItem = newData[rowIndex];
-    // Ensure currentItem is an object before trying to spread it or assign to its keys
+    
     if (typeof currentItem !== 'object' || currentItem === null) {
         console.error("Cannot edit item, it's not an object:", currentItem);
         setEditingCell(null);
@@ -217,23 +218,19 @@ const JsonTableViewerPage: NextPage = () => {
     let parsedNewValue: any = currentEditValue;
 
     try {
-      if (currentEditValue.trim() === "") { // Handle empty string input
+      if (currentEditValue.trim() === "") { 
         parsedNewValue = (originalValue === null || typeof originalValue === 'string') ? "" : null;
       } else if (typeof originalValue === 'number' && !isNaN(Number(currentEditValue))) {
         parsedNewValue = Number(currentEditValue);
       } else if (typeof originalValue === 'boolean') {
         if (currentEditValue.toLowerCase() === 'true') parsedNewValue = true;
         else if (currentEditValue.toLowerCase() === 'false') parsedNewValue = false;
-        // else keep as string if not clearly boolean
       } else if ((typeof originalValue === 'object' && originalValue !== null) || 
                  (currentEditValue.startsWith('{') && currentEditValue.endsWith('}')) || 
                  (currentEditValue.startsWith('[') && currentEditValue.endsWith(']'))) {
         parsedNewValue = JSON.parse(currentEditValue);
       }
-      // Default: keep as string (parsedNewValue is already currentEditValue)
     } catch (e) {
-      // If JSON.parse fails or other conversion error, keep currentEditValue as string
-      // A toast could be added here for parse errors if desired.
       console.warn(`Failed to parse '${currentEditValue}' for cell [${rowIndex}, ${headerKey}]. Saving as string.`);
     }
     
@@ -244,20 +241,18 @@ const JsonTableViewerPage: NextPage = () => {
 
   const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
-      event.preventDefault(); // Prevent form submission if wrapped in one
+      event.preventDefault(); 
       handleSaveEdit();
     } else if (event.key === 'Escape') {
-      setEditingCell(null); // Cancel edit
+      setEditingCell(null); 
     }
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading) return; // Prevent editing while loading
-    // If already editing this cell, do nothing to allow normal input interaction
+    if (isLoading) return; 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
     }
-    // If editing another cell, save it first
     if (editingCell) {
       handleSaveEdit();
     }
@@ -265,12 +260,40 @@ const JsonTableViewerPage: NextPage = () => {
     setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
   };
 
+  const handleAddRow = useCallback(() => {
+    if (isLoading) return; 
+    
+    setEditingCell(null); 
+
+    const newRow: { [key: string]: any } = {};
+    let currentHeaders = [...tableHeaders];
+
+    if (currentHeaders.length === 0) {
+      const defaultHeader = "new_column_1";
+      currentHeaders = [defaultHeader];
+      setTableHeaders(currentHeaders); 
+      newRow[defaultHeader] = "";
+    } else {
+      currentHeaders.forEach(header => {
+        newRow[header] = "";
+      });
+    }
+    
+    setTableData(prevData => {
+      const data = prevData ? [...prevData] : []; // Ensure prevData is an array
+      return [...data, newRow];
+    });
+
+    setSuccessMessage("New row added. Click cells to edit.");
+    setError(null); 
+  }, [isLoading, tableHeaders, setTableHeaders, setTableData, setSuccessMessage, setError]);
+
 
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
       <header className="mb-8 text-center">
         <h1 className="text-4xl font-headline font-bold text-primary">JSON Table Viewer</h1>
-        <p className="text-muted-foreground mt-2">Upload or paste JSON to view, edit, and export data.</p>
+        <p className="text-muted-foreground mt-2">Upload or paste JSON to view, edit, add rows, and export data.</p>
       </header>
 
       <Card className="mb-8 shadow-lg rounded-xl">
@@ -279,7 +302,7 @@ const JsonTableViewerPage: NextPage = () => {
             <FileJsonIcon className="text-primary w-7 h-7" />
             Input JSON Data
           </CardTitle>
-          <CardDescription>Upload a .json file or paste content. Edit data directly in the table below.</CardDescription>
+          <CardDescription>Upload a .json file or paste content. Edit data or add new rows in the table below.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -351,22 +374,34 @@ const JsonTableViewerPage: NextPage = () => {
           <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <CardTitle className="text-2xl font-headline">Data Table</CardTitle>
-              <CardDescription>View and sort your JSON data. Click a cell to edit its content. Click column headers to sort.</CardDescription>
+              <CardDescription>View, sort, and edit your JSON data. Add new rows or export to CSV. Click column headers to sort.</CardDescription>
             </div>
-            <Button 
-              onClick={exportToCsv}
-              variant="outline"
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-              aria-label="Export table data to CSV"
-              disabled={isLoading || !sortedTableData.length}
-            >
-              <Download className="mr-2 h-5 w-5" />
-              Export as CSV
-            </Button>
+            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+              <Button 
+                onClick={handleAddRow}
+                variant="outline"
+                className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                aria-label="Add new row to table"
+                disabled={isLoading}
+              >
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Add Row
+              </Button>
+              <Button 
+                onClick={exportToCsv}
+                variant="outline"
+                className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                aria-label="Export table data to CSV"
+                disabled={isLoading || !sortedTableData.length}
+              >
+                <Download className="mr-2 h-5 w-5" />
+                Export as CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {sortedTableData.length === 0 && !isLoading ? (
-              <p className="text-muted-foreground text-center py-8">No data to display in table. The JSON might be valid but represents an empty dataset.</p>
+              <p className="text-muted-foreground text-center py-8">No data to display in table. The JSON might be valid but represents an empty dataset. Try adding a row.</p>
             ) : (
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -399,9 +434,8 @@ const JsonTableViewerPage: NextPage = () => {
                       {tableHeaders.map((headerKey) => (
                         <TableCell 
                           key={`${rowIndex}-${headerKey}`} 
-                          className="p-0 text-sm relative" /* p-0 allows input to fill cell */
+                          className="p-0 text-sm relative" 
                           onClickCapture={(e) => { 
-                            // If click target is already the input, don't re-trigger cell click
                             if ((e.target as HTMLElement).tagName === 'INPUT') return;
                             handleCellClick(rowIndex, headerKey);
                           }}
@@ -411,14 +445,14 @@ const JsonTableViewerPage: NextPage = () => {
                               type="text"
                               value={currentEditValue}
                               onChange={(e) => setCurrentEditValue(e.target.value)}
-                              onBlurCapture={handleSaveEdit} // Use onBlurCapture to ensure it fires before potential parent onClick
+                              onBlurCapture={handleSaveEdit} 
                               onKeyDown={handleEditKeyDown}
                               autoFocus
                               className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
                             />
                           ) : (
                             <div 
-                              className="p-3 truncate cursor-pointer hover:bg-muted/30 w-full h-full box-border min-h-[2.5rem] flex items-center" /* min-h to match input */
+                              className="p-3 truncate cursor-pointer hover:bg-muted/30 w-full h-full box-border min-h-[2.5rem] flex items-center"
                               title={getDisplayValue(row[headerKey])}
                             >
                               {getDisplayValue(row[headerKey])}
