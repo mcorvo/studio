@@ -1,16 +1,19 @@
 
+datasource db {
+  provider = "postgresql" // Or your chosen provider like "mysql", "sqlite"
+  url      = env("DATABASE_URL")
+}
+
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql" // Ensure this matches your database (e.g., "mysql", "sqlite")
-  url      = env("DATABASE_URL")
-}
-
-model TableEntry {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  data      Json     // Stores the actual row data as a JSON object
+model License {
+  id             Int     @default(autoincrement()) @id
+  Produttore     String
+  Prodotto       String
+  Tipo_Licenza   String
+  Numero_Licenze Int
+  Bundle         Int
+  Borrowable     Boolean
 }

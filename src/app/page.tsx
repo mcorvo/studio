@@ -23,6 +23,9 @@ interface EditingCell {
   headerKey: string;
 }
 
+// Expected headers for the License model (excluding 'id' for default new row creation)
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable'];
+
 // Helper to get all unique keys from an array of objects
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -31,11 +34,20 @@ const getAllKeys = (data: any[]): string[] => {
       Object.keys(item).forEach(key => allKeys.add(key));
     }
   });
-  return Array.from(allKeys);
+  // Ensure 'id' is first if present, then license model headers, then any others
+  const sortedKeys = Array.from(allKeys);
+  if (sortedKeys.includes('id')) {
+    sortedKeys.splice(sortedKeys.indexOf('id'), 1);
+    sortedKeys.unshift('id');
+  }
+  return sortedKeys;
 };
 
 // Helper to get value, handling nested objects/arrays by stringifying them
 const getDisplayValue = (value: any): string => {
+  if (typeof value === 'boolean') {
+    return value.toString();
+  }
   if (typeof value === 'object' && value !== null) {
     try {
       return JSON.stringify(value);
@@ -49,7 +61,7 @@ const getDisplayValue = (value: any): string => {
   return String(value);
 };
 
-const JsonTableViewerPage: NextPage = () => {
+const LicenseManagementPage: NextPage = () => {
   const [jsonInput, setJsonInput] = useState<string>('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [tableData, setTableData] = useState<any[] | null>(null);
@@ -57,7 +69,7 @@ const JsonTableViewerPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false); // Covers all loading states
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
 
@@ -86,8 +98,8 @@ const JsonTableViewerPage: NextPage = () => {
       }
     } catch (err) {
       setError(`Failed to load data from database: ${err instanceof Error ? err.message : String(err)}`);
-      setTableData(null); // Clear table on DB load error
-      setTableHeaders([]);
+      setTableData([]); // Clear table on DB load error, but initialize as empty array
+      setTableHeaders(LICENSE_MODEL_HEADERS); // Set default headers for empty state
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +111,7 @@ const JsonTableViewerPage: NextPage = () => {
 
 
   const saveDataToDB = useCallback(async () => {
-    if (!tableData) { // Though API handles [], prevent call if explicitly null
+    if (!tableData) {
       setError("No data to save.");
       return;
     }
@@ -108,24 +120,34 @@ const JsonTableViewerPage: NextPage = () => {
     setSuccessMessage(null);
     setEditingCell(null);
     try {
+      // Filter out 'id' from data being sent if it's not a number (e.g. for new rows)
+      // The API already handles not including 'id' for inserts, but good practice
+      const dataToSend = tableData.map(row => {
+        const { id, ...rest } = row;
+        return (typeof id === 'number' && id > 0) ? row : rest; // Send id only if it's a valid existing one
+      });
+
+
       const response = await fetch('/api/tabledata', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(tableData || []), // Send empty array if tableData is null
+        body: JSON.stringify(dataToSend),
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `Failed to save data: ${response.statusText}`);
       }
       setSuccessMessage("Data successfully saved to database.");
+      // Optionally, reload data from DB to get new IDs and ensure consistency
+      loadDataFromDB();
     } catch (err) {
       setError(`Failed to save data to database: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
-  }, [tableData]);
+  }, [tableData, loadDataFromDB]);
 
 
   const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
@@ -135,7 +157,7 @@ const JsonTableViewerPage: NextPage = () => {
       setError(null);
       setSuccessMessage(null);
       setFileName(file.name);
-      setEditingCell(null); 
+      setEditingCell(null);
       try {
         const text = await file.text();
         setJsonInput(text);
@@ -146,7 +168,7 @@ const JsonTableViewerPage: NextPage = () => {
         setFileName(null);
       } finally {
         setIsLoading(false);
-        event.target.value = ''; 
+        event.target.value = '';
       }
     }
   }, []);
@@ -156,44 +178,41 @@ const JsonTableViewerPage: NextPage = () => {
     setError(null);
     setSuccessMessage(null);
     setSortConfig(null);
-    setEditingCell(null); 
+    setEditingCell(null);
 
     if (!jsonInput.trim()) {
       setError("JSON input is empty. Clearing table.");
-      setTableData([]); 
-      setTableHeaders([]); 
+      setTableData([]);
+      setTableHeaders(LICENSE_MODEL_HEADERS); // Default headers if input is cleared
       setIsLoading(false);
       return;
     }
 
     try {
       let parsedData = JSON.parse(jsonInput);
-      
       if (typeof parsedData !== 'object' || parsedData === null) {
         throw new Error("Input is not a valid JSON object or array.");
       }
-
-      let dataArray: any[];
-      if (Array.isArray(parsedData)) {
-        dataArray = parsedData;
-      } else {
-        dataArray = [parsedData];
-      }
-
+      let dataArray: any[] = Array.isArray(parsedData) ? parsedData : [parsedData];
       if (dataArray.length === 0) {
         setTableData([]);
-        setTableHeaders(getAllKeys(dataArray)); 
+        setTableHeaders(getAllKeys(dataArray).length > 0 ? getAllKeys(dataArray) : LICENSE_MODEL_HEADERS);
         setSuccessMessage("JSON processed. The array is empty.");
-        setIsLoading(false);
-        return;
+      } else {
+        // Basic validation for license structure
+        dataArray = dataArray.map(item => {
+          if (typeof item !== 'object' || item === null) return { value: item }; // Keep malformed items as is for now
+          const newItem: any = {};
+          LICENSE_MODEL_HEADERS.forEach(header => {
+            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'Borrowable' ? false : ''));
+          });
+          if (item.id) newItem.id = item.id; // Preserve ID if present
+          return newItem;
+        });
+        setTableHeaders(getAllKeys(dataArray));
+        setTableData(dataArray);
+        setSuccessMessage("JSON data successfully processed and table updated.");
       }
-      
-      dataArray = dataArray.map(item => (typeof item !== 'object' || item === null) ? { value: item } : item);
-
-      const headers = getAllKeys(dataArray);
-      setTableHeaders(headers);
-      setTableData(dataArray);
-      setSuccessMessage("JSON data successfully processed and table updated.");
     } catch (err) {
       setError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
       setTableData(null);
@@ -210,7 +229,6 @@ const JsonTableViewerPage: NextPage = () => {
       sortableItems.sort((a, b) => {
         const valA = getDisplayValue(a[sortConfig.key]);
         const valB = getDisplayValue(b[sortConfig.key]);
-        
         if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
         return 0;
@@ -220,14 +238,15 @@ const JsonTableViewerPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
+    if (key === 'id') return; // Do not sort by ID for now, or make it specific
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
-    setEditingCell(null); 
+    setEditingCell(null);
   };
-  
+
   const escapeCsvCell = (cellData: any): string => {
     const stringValue = getDisplayValue(cellData);
     if (/[",\n]/.test(stringValue)) {
@@ -242,20 +261,18 @@ const JsonTableViewerPage: NextPage = () => {
       return;
     }
     setError(null);
-    setEditingCell(null); 
-
+    setEditingCell(null);
     try {
       const csvHeader = tableHeaders.map(escapeCsvCell).join(',');
-      const csvRows = sortedTableData.map(row => 
+      const csvRows = sortedTableData.map(row =>
         tableHeaders.map(header => escapeCsvCell(row[header])).join(',')
       );
-
       const csvContent = `${csvHeader}\n${csvRows.join('\n')}`;
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      const exportFileName = fileName ? `${fileName.split('.')[0]}.csv` : 'table_export.csv';
+      const exportFileName = fileName ? `${fileName.split('.')[0]}.csv` : 'licenses_export.csv';
       link.setAttribute('download', exportFileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
@@ -270,36 +287,31 @@ const JsonTableViewerPage: NextPage = () => {
 
   const handleSaveEdit = useCallback(() => {
     if (!editingCell || !tableData) return;
-
     const { rowIndex, headerKey } = editingCell;
     const newData = [...tableData];
     const currentItem = newData[rowIndex];
-    
     if (typeof currentItem !== 'object' || currentItem === null) {
-        console.error("Cannot edit item, it's not an object:", currentItem);
-        setEditingCell(null);
-        return;
+      setEditingCell(null);
+      return;
     }
     const originalValue = currentItem[headerKey];
     let parsedNewValue: any = currentEditValue;
-
     try {
-      if (currentEditValue.trim() === "") { 
-        parsedNewValue = (originalValue === null || typeof originalValue === 'string') ? "" : null;
-      } else if (typeof originalValue === 'number' && !isNaN(Number(currentEditValue))) {
-        parsedNewValue = Number(currentEditValue);
-      } else if (typeof originalValue === 'boolean') {
-        if (currentEditValue.toLowerCase() === 'true') parsedNewValue = true;
-        else if (currentEditValue.toLowerCase() === 'false') parsedNewValue = false;
-      } else if ((typeof originalValue === 'object' && originalValue !== null) || 
-                 (currentEditValue.startsWith('{') && currentEditValue.endsWith('}')) || 
-                 (currentEditValue.startsWith('[') && currentEditValue.endsWith(']'))) {
-        parsedNewValue = JSON.parse(currentEditValue);
+      if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
+         parsedNewValue = "";
+      } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
+        const num = parseInt(currentEditValue, 10);
+        parsedNewValue = isNaN(num) ? (originalValue || 0) : num; // Keep original or 0 if NaN
+      } else if (headerKey === 'Borrowable') {
+        parsedNewValue = currentEditValue.toLowerCase() === 'true';
+      } else if (typeof originalValue === 'string' || originalValue === null || originalValue === undefined) {
+        parsedNewValue = currentEditValue; // Treat as string if original was string or empty
       }
+      // No JSON.parse for simple fields in License model
     } catch (e) {
       console.warn(`Failed to parse '${currentEditValue}' for cell [${rowIndex}, ${headerKey}]. Saving as string.`);
+      parsedNewValue = currentEditValue; // Fallback to string if specific parsing fails
     }
-    
     newData[rowIndex] = { ...currentItem, [headerKey]: parsedNewValue };
     setTableData(newData);
     setEditingCell(null);
@@ -307,15 +319,15 @@ const JsonTableViewerPage: NextPage = () => {
 
   const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
-      event.preventDefault(); 
+      event.preventDefault();
       handleSaveEdit();
     } else if (event.key === 'Escape') {
-      setEditingCell(null); 
+      setEditingCell(null);
     }
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading) return; 
+    if (isLoading || headerKey === 'id') return; // Prevent editing 'id' column
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
     }
@@ -327,48 +339,53 @@ const JsonTableViewerPage: NextPage = () => {
   };
 
   const handleAddRow = useCallback(() => {
-    if (isLoading) return; 
+    if (isLoading) return;
+    setEditingCell(null);
+    const newRow: { [key: string]: any } = {
+      Produttore: "",
+      Prodotto: "",
+      Tipo_Licenza: "",
+      Numero_Licenze: 0,
+      Bundle: 0,
+      Borrowable: false,
+    };
     
-    setEditingCell(null); 
-
-    const newRow: { [key: string]: any } = {};
     let currentHeaders = [...tableHeaders];
-
-    if (currentHeaders.length === 0) {
-      const defaultHeader = "new_column_1";
-      currentHeaders = [defaultHeader];
-      setTableHeaders(currentHeaders); 
-      newRow[defaultHeader] = "";
-    } else {
-      currentHeaders.forEach(header => {
-        newRow[header] = "";
-      });
+    if (currentHeaders.length === 0 || !LICENSE_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
+        currentHeaders = [...LICENSE_MODEL_HEADERS];
+        if (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id')) {
+            currentHeaders.unshift('id'); // Add id if it exists in current data
+        }
+        setTableHeaders(currentHeaders);
     }
-    
-    setTableData(prevData => {
-      const data = prevData ? [...prevData] : []; 
-      return [...data, newRow];
+     // Ensure all LICENSE_MODEL_HEADERS are present in the newRow object for consistency
+    LICENSE_MODEL_HEADERS.forEach(header => {
+        if (!newRow.hasOwnProperty(header)) {
+            newRow[header] = header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'Borrowable' ? false : '');
+        }
     });
 
+
+    setTableData(prevData => [...(prevData || []), newRow]);
     setSuccessMessage("New row added. Click cells to edit. Save to persist changes to DB.");
-    setError(null); 
-  }, [isLoading, tableHeaders, setTableHeaders, setTableData, setSuccessMessage, setError]);
+    setError(null);
+  }, [isLoading, tableHeaders, tableData]);
 
 
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
       <header className="mb-8 text-center">
-        <h1 className="text-4xl font-headline font-bold text-primary">JSON Table Viewer & Editor</h1>
-        <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add rows, and persist data to a database.</p>
+        <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
+        <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add license rows, and persist data to a database.</p>
       </header>
 
       <Card className="mb-8 shadow-lg rounded-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl font-headline">
             <FileJsonIcon className="text-primary w-7 h-7" />
-            Input JSON Data
+            Input License Data (JSON)
           </CardTitle>
-          <CardDescription>Upload a .json file or paste content. Edit data or add new rows in the table below. Save to persist changes.</CardDescription>
+          <CardDescription>Upload a .json file or paste content. New data will replace existing table content. Save to persist to DB.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -384,14 +401,14 @@ const JsonTableViewerPage: NextPage = () => {
             />
             {fileName && !error && jsonInput && <p className="text-sm text-muted-foreground mt-1">Loaded file: {fileName}</p>}
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="json-textarea" className="font-semibold text-lg">Or Paste JSON Here</Label>
             <Textarea
               id="json-textarea"
               value={jsonInput}
               onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
-              placeholder='e.g., [{"id": 1, "name": "Example"}, {"id": 2, "name": "Data"}]'
+              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true}]'
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
               aria-label="Paste JSON data"
@@ -400,13 +417,13 @@ const JsonTableViewerPage: NextPage = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button 
-            onClick={processJson} 
+          <Button
+            onClick={processJson}
             disabled={isLoading || !jsonInput.trim()}
             className="bg-accent hover:bg-accent/90 text-accent-foreground w-full md:w-auto rounded-md text-base py-3 px-6"
             aria-label="View JSON data as table"
           >
-            {isLoading && jsonInput.trim() && !successMessage?.includes("database") ? ( // Differentiate spinner source
+            {isLoading && jsonInput.trim() && !successMessage?.includes("database") ? (
               <span className="flex items-center justify-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -419,7 +436,7 @@ const JsonTableViewerPage: NextPage = () => {
         </CardFooter>
       </Card>
 
-      {isLoading && (successMessage?.includes("database") || error?.includes("database") || (!jsonInput.trim() && !fileName)) && ( // More specific loading indicator for DB ops
+      {isLoading && (successMessage?.includes("database") || error?.includes("database") || (!jsonInput.trim() && !fileName && !tableData)) && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
             <div className="flex items-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -448,26 +465,25 @@ const JsonTableViewerPage: NextPage = () => {
         </Alert>
       )}
 
-      {/* Render table section if tableData is initialized (even if empty array) */}
       {tableData !== null && (
         <Card className="shadow-lg rounded-xl">
           <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <CardTitle className="text-2xl font-headline">Data Table</CardTitle>
-              <CardDescription>View, sort, and edit your data. Save changes to the database. Click column headers to sort.</CardDescription>
+              <CardTitle className="text-2xl font-headline">License Data Table</CardTitle>
+              <CardDescription>View, sort, and edit license data. 'id' is database-generated and not editable. Save changes to the database.</CardDescription>
             </div>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-               <Button 
+               <Button
                 onClick={saveDataToDB}
                 variant="default"
                 className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
                 aria-label="Save table data to database"
-                disabled={isLoading}
+                disabled={isLoading || !tableData || tableData.length === 0}
               >
                 <Save className="mr-2 h-5 w-5" />
                 Save to Database
               </Button>
-              <Button 
+              <Button
                 onClick={handleAddRow}
                 variant="outline"
                 className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
@@ -477,7 +493,7 @@ const JsonTableViewerPage: NextPage = () => {
                 <PlusCircle className="mr-2 h-5 w-5" />
                 Add Row
               </Button>
-              <Button 
+              <Button
                 onClick={exportToCsv}
                 variant="outline"
                 className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
@@ -490,7 +506,6 @@ const JsonTableViewerPage: NextPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Show loading spinner specifically for initial table data load if tableData is still null and isLoading is true */}
             {tableData === null && isLoading ? (
                 <div className="flex justify-center items-center py-10">
                     <svg className="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -500,7 +515,7 @@ const JsonTableViewerPage: NextPage = () => {
                     <p className="ml-3 text-muted-foreground">Loading data from database...</p>
                 </div>
             ) : sortedTableData && sortedTableData.length === 0 && !isLoading ? (
-              <p className="text-muted-foreground text-center py-8">No data to display in table. Try adding a row or loading JSON from input/file. If data was loaded from DB, it might be empty.</p>
+              <p className="text-muted-foreground text-center py-8">No license data to display. Try adding a row or loading JSON. If data was loaded from DB, it might be empty.</p>
             ) : sortedTableData && sortedTableData.length > 0 ? (
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -508,19 +523,19 @@ const JsonTableViewerPage: NextPage = () => {
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     {tableHeaders.map((headerKey) => (
-                      <TableHead 
-                        key={headerKey} 
+                      <TableHead
+                        key={headerKey}
                         onClick={() => requestSort(headerKey)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''}`}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' ? 'cursor-default' : ''}`}
                         aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
-                        title={`Sort by ${headerKey}`}
+                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : `Sort by ${headerKey}`}
                       >
                         <div className="flex items-center gap-1">
                           {headerKey}
-                          {sortConfig?.key === headerKey ? (
+                          {headerKey !== 'id' && sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
-                            <ArrowUpDown className="h-4 w-4 opacity-30" />
+                           headerKey !== 'id' && <ArrowUpDown className="h-4 w-4 opacity-30" />
                           )}
                         </div>
                       </TableHead>
@@ -529,29 +544,29 @@ const JsonTableViewerPage: NextPage = () => {
                 </TableHeader>
                 <TableBody>
                   {sortedTableData.map((row, rowIndex) => (
-                    <TableRow key={rowIndex} className="hover:bg-muted/20 transition-colors data-[state=selected]:bg-muted">
+                    <TableRow key={row.id || rowIndex} className="hover:bg-muted/20 transition-colors data-[state=selected]:bg-muted">
                       {tableHeaders.map((headerKey) => (
-                        <TableCell 
-                          key={`${rowIndex}-${headerKey}`} 
-                          className="p-0 text-sm relative" 
-                          onClickCapture={(e) => { 
-                            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+                        <TableCell
+                          key={`${row.id || rowIndex}-${headerKey}`}
+                          className="p-0 text-sm relative"
+                          onClickCapture={(e) => {
+                            if ((e.target as HTMLElement).tagName === 'INPUT' || headerKey === 'id') return;
                             handleCellClick(rowIndex, headerKey);
                           }}
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
                             <Input
-                              type="text"
+                              type={headerKey === 'Numero_Licenze' || headerKey === 'Bundle' ? 'number' : 'text'}
                               value={currentEditValue}
                               onChange={(e) => setCurrentEditValue(e.target.value)}
-                              onBlurCapture={handleSaveEdit} 
+                              onBlurCapture={handleSaveEdit}
                               onKeyDown={handleEditKeyDown}
                               autoFocus
                               className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
                             />
                           ) : (
-                            <div 
-                              className="p-3 truncate cursor-pointer hover:bg-muted/30 w-full h-full box-border min-h-[2.5rem] flex items-center"
+                            <div
+                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                               title={getDisplayValue(row[headerKey])}
                             >
                               {getDisplayValue(row[headerKey])}
@@ -564,7 +579,7 @@ const JsonTableViewerPage: NextPage = () => {
                 </TableBody>
               </Table>
             </div>
-            ) : null /* Covers cases where sortedTableData is null but not loading */ }
+            ) : null }
           </CardContent>
         </Card>
       )}
@@ -572,4 +587,4 @@ const JsonTableViewerPage: NextPage = () => {
   );
 };
 
-export default JsonTableViewerPage;
+export default LicenseManagementPage;

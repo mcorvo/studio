@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'JSON Table Viewer',
-  description: 'View and export JSON data as tables and CSV files.',
+  title: 'License Data Management',
+  description: 'Manage, view, and edit license data, and persist to a database.',
 };
 
 export default function RootLayout({
