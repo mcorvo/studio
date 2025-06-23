@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // Helper to check if data is an array of objects, suitable for License model
 function isValidLicenseData(data: any): data is Partial<Omit<typeof prisma.license.fields, 'id'>>[] {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     });
 
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.license.deleteMany({}); // Clear all existing license entries
 
       if (dataToCreate.length > 0) {
