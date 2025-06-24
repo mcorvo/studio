@@ -17,4 +17,7 @@ model License {
   Numero_Licenze Int
   Bundle         Int
   Borrowable     Boolean
+  Rivenditore    String
+  Contratto      String
+  Scadenza       DateTime
 }
