@@ -10,7 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -23,10 +28,8 @@ interface EditingCell {
   headerKey: string;
 }
 
-// Expected headers for the License model (excluding 'id' for default new row creation)
-const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable'];
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Scadenza'];
 
-// Helper to get all unique keys from an array of objects
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
   data.forEach(item => {
@@ -34,7 +37,6 @@ const getAllKeys = (data: any[]): string[] => {
       Object.keys(item).forEach(key => allKeys.add(key));
     }
   });
-  // Ensure 'id' is first if present, then license model headers, then any others
   const sortedKeys = Array.from(allKeys);
   if (sortedKeys.includes('id')) {
     sortedKeys.splice(sortedKeys.indexOf('id'), 1);
@@ -43,8 +45,10 @@ const getAllKeys = (data: any[]): string[] => {
   return sortedKeys;
 };
 
-// Helper to get value, handling nested objects/arrays by stringifying them
 const getDisplayValue = (value: any): string => {
+  if (value instanceof Date) {
+    return format(value, 'yyyy-MM-dd');
+  }
   if (typeof value === 'boolean') {
     return value.toString();
   }
@@ -72,6 +76,7 @@ const LicenseManagementPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
@@ -98,8 +103,8 @@ const LicenseManagementPage: NextPage = () => {
       }
     } catch (err) {
       setError(`Failed to load data from database: ${err instanceof Error ? err.message : String(err)}`);
-      setTableData([]); // Clear table on DB load error, but initialize as empty array
-      setTableHeaders(LICENSE_MODEL_HEADERS); // Set default headers for empty state
+      setTableData([]);
+      setTableHeaders(LICENSE_MODEL_HEADERS);
     } finally {
       setIsLoading(false);
     }
@@ -120,13 +125,10 @@ const LicenseManagementPage: NextPage = () => {
     setSuccessMessage(null);
     setEditingCell(null);
     try {
-      // Filter out 'id' from data being sent if it's not a number (e.g. for new rows)
-      // The API already handles not including 'id' for inserts, but good practice
       const dataToSend = tableData.map(row => {
         const { id, ...rest } = row;
-        return (typeof id === 'number' && id > 0) ? row : rest; // Send id only if it's a valid existing one
+        return (typeof id === 'number' && id > 0) ? row : rest;
       });
-
 
       const response = await fetch('/api/tabledata', {
         method: 'POST',
@@ -140,7 +142,6 @@ const LicenseManagementPage: NextPage = () => {
         throw new Error(errorData.message || `Failed to save data: ${response.statusText}`);
       }
       setSuccessMessage("Data successfully saved to database.");
-      // Optionally, reload data from DB to get new IDs and ensure consistency
       loadDataFromDB();
     } catch (err) {
       setError(`Failed to save data to database: ${err instanceof Error ? err.message : String(err)}`);
@@ -183,30 +184,26 @@ const LicenseManagementPage: NextPage = () => {
     if (!jsonInput.trim()) {
       setError("JSON input is empty. Clearing table.");
       setTableData([]);
-      setTableHeaders(LICENSE_MODEL_HEADERS); // Default headers if input is cleared
+      setTableHeaders(LICENSE_MODEL_HEADERS);
       setIsLoading(false);
       return;
     }
 
     try {
       let parsedData = JSON.parse(jsonInput);
-      if (typeof parsedData !== 'object' || parsedData === null) {
-        throw new Error("Input is not a valid JSON object or array.");
-      }
       let dataArray: any[] = Array.isArray(parsedData) ? parsedData : [parsedData];
       if (dataArray.length === 0) {
         setTableData([]);
         setTableHeaders(getAllKeys(dataArray).length > 0 ? getAllKeys(dataArray) : LICENSE_MODEL_HEADERS);
         setSuccessMessage("JSON processed. The array is empty.");
       } else {
-        // Basic validation for license structure
         dataArray = dataArray.map(item => {
-          if (typeof item !== 'object' || item === null) return { value: item }; // Keep malformed items as is for now
+          if (typeof item !== 'object' || item === null) return { value: item };
           const newItem: any = {};
           LICENSE_MODEL_HEADERS.forEach(header => {
             newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'Borrowable' ? false : ''));
           });
-          if (item.id) newItem.id = item.id; // Preserve ID if present
+          if (item.id) newItem.id = item.id;
           return newItem;
         });
         setTableHeaders(getAllKeys(dataArray));
@@ -238,7 +235,7 @@ const LicenseManagementPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
-    if (key === 'id') return; // Do not sort by ID for now, or make it specific
+    if (key === 'id') return;
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -296,26 +293,38 @@ const LicenseManagementPage: NextPage = () => {
     }
     const originalValue = currentItem[headerKey];
     let parsedNewValue: any = currentEditValue;
-    try {
-      if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
-         parsedNewValue = "";
-      } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
-        const num = parseInt(currentEditValue, 10);
-        parsedNewValue = isNaN(num) ? (originalValue || 0) : num; // Keep original or 0 if NaN
-      } else if (headerKey === 'Borrowable') {
-        parsedNewValue = currentEditValue.toLowerCase() === 'true';
-      } else if (typeof originalValue === 'string' || originalValue === null || originalValue === undefined) {
-        parsedNewValue = currentEditValue; // Treat as string if original was string or empty
-      }
-      // No JSON.parse for simple fields in License model
-    } catch (e) {
-      console.warn(`Failed to parse '${currentEditValue}' for cell [${rowIndex}, ${headerKey}]. Saving as string.`);
-      parsedNewValue = currentEditValue; // Fallback to string if specific parsing fails
+
+    if (headerKey !== 'Scadenza') {
+        try {
+          if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
+             parsedNewValue = "";
+          } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
+            const num = parseInt(currentEditValue, 10);
+            parsedNewValue = isNaN(num) ? (originalValue || 0) : num;
+          } else if (headerKey === 'Borrowable') {
+            parsedNewValue = currentEditValue.toLowerCase() === 'true';
+          } else if (typeof originalValue === 'string' || originalValue === null || originalValue === undefined) {
+            parsedNewValue = currentEditValue;
+          }
+        } catch (e) {
+          console.warn(`Failed to parse '${currentEditValue}' for cell [${rowIndex}, ${headerKey}]. Saving as string.`);
+          parsedNewValue = currentEditValue;
+        }
     }
+
     newData[rowIndex] = { ...currentItem, [headerKey]: parsedNewValue };
     setTableData(newData);
     setEditingCell(null);
   }, [editingCell, currentEditValue, tableData]);
+
+  const handleDateSelect = (date: Date | undefined, rowIndex: number, headerKey: string) => {
+    if (!date || !tableData) return;
+    const newData = [...tableData];
+    newData[rowIndex] = { ...newData[rowIndex], [headerKey]: format(date, 'yyyy-MM-dd') };
+    setTableData(newData);
+    setDatePickerOpen(false);
+    setEditingCell(null);
+  };
 
   const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -327,7 +336,7 @@ const LicenseManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id') return; // Prevent editing 'id' column
+    if (isLoading || headerKey === 'id') return;
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
     }
@@ -341,30 +350,33 @@ const LicenseManagementPage: NextPage = () => {
   const handleAddRow = useCallback(() => {
     if (isLoading) return;
     setEditingCell(null);
-    const newRow: { [key: string]: any } = {
-      Produttore: "",
-      Prodotto: "",
-      Tipo_Licenza: "",
-      Numero_Licenze: 0,
-      Bundle: 0,
-      Borrowable: false,
-    };
+    const newRow: { [key: string]: any } = {};
+
+    LICENSE_MODEL_HEADERS.forEach(header => {
+        switch(header) {
+            case 'Numero_Licenze':
+            case 'Bundle':
+                newRow[header] = 0;
+                break;
+            case 'Borrowable':
+                newRow[header] = false;
+                break;
+            case 'Scadenza':
+                newRow[header] = null;
+                break;
+            default:
+                newRow[header] = "";
+        }
+    });
     
     let currentHeaders = [...tableHeaders];
     if (currentHeaders.length === 0 || !LICENSE_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
         currentHeaders = [...LICENSE_MODEL_HEADERS];
         if (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id')) {
-            currentHeaders.unshift('id'); // Add id if it exists in current data
+            currentHeaders.unshift('id');
         }
         setTableHeaders(currentHeaders);
     }
-     // Ensure all LICENSE_MODEL_HEADERS are present in the newRow object for consistency
-    LICENSE_MODEL_HEADERS.forEach(header => {
-        if (!newRow.hasOwnProperty(header)) {
-            newRow[header] = header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'Borrowable' ? false : '');
-        }
-    });
-
 
     setTableData(prevData => [...(prevData || []), newRow]);
     setSuccessMessage("New row added. Click cells to edit. Save to persist changes to DB.");
@@ -408,7 +420,7 @@ const LicenseManagementPage: NextPage = () => {
               id="json-textarea"
               value={jsonInput}
               onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
-              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true}]'
+              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Scadenza": "2025-12-31"}]'
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
               aria-label="Paste JSON data"
@@ -550,20 +562,46 @@ const LicenseManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                            if ((e.target as HTMLElement).tagName === 'INPUT' || headerKey === 'id') return;
+                            if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id') return;
                             handleCellClick(rowIndex, headerKey);
                           }}
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
-                            <Input
-                              type={headerKey === 'Numero_Licenze' || headerKey === 'Bundle' ? 'number' : 'text'}
-                              value={currentEditValue}
-                              onChange={(e) => setCurrentEditValue(e.target.value)}
-                              onBlurCapture={handleSaveEdit}
-                              onKeyDown={handleEditKeyDown}
-                              autoFocus
-                              className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
-                            />
+                            headerKey === 'Scadenza' ? (
+                                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal h-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0",
+                                                !row[headerKey] && "text-muted-foreground"
+                                            )}
+                                            onClick={() => setDatePickerOpen(true)}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {row[headerKey] ? format(new Date(row[headerKey]), "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={row[headerKey] ? new Date(row[headerKey]) : undefined}
+                                            onSelect={(date) => handleDateSelect(date, rowIndex, headerKey)}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            ) : (
+                                <Input
+                                  type={headerKey === 'Numero_Licenze' || headerKey === 'Bundle' ? 'number' : 'text'}
+                                  value={currentEditValue}
+                                  onChange={(e) => setCurrentEditValue(e.target.value)}
+                                  onBlurCapture={handleSaveEdit}
+                                  onKeyDown={handleEditKeyDown}
+                                  autoFocus
+                                  className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
+                                />
+                            )
                           ) : (
                             <div
                               className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
