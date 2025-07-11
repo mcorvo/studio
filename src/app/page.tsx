@@ -10,11 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,10 +89,12 @@ const LicenseManagementPage: NextPage = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isNotifying, setIsNotifying] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [resellerInfo, setResellerInfo] = useState<ResellerInfo | null>(null);
+  const { toast } = useToast();
 
 
   const loadDataFromDB = useCallback(async () => {
@@ -413,6 +416,53 @@ const LicenseManagementPage: NextPage = () => {
     setError(null);
   }, [isLoading, tableHeaders, tableData]);
 
+  const handleNotify = useCallback(async () => {
+    setIsNotifying(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    toast({
+        title: "Checking for expiring licenses...",
+        description: "This may take a moment. Please wait.",
+    });
+
+    try {
+        const response = await fetch('/api/notify-expirations');
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || 'An unknown error occurred.');
+        }
+
+        const emailCount = result.details?.sentEmails?.length || 0;
+        if (emailCount > 0) {
+            toast({
+                title: "Notifications Generated",
+                description: `Successfully generated ${emailCount} email(s) for expiring licenses.`,
+                variant: "default",
+            });
+            setSuccessMessage(`Successfully generated ${emailCount} email(s). Note: This mock-up generates email content but does not send them.`)
+        } else {
+             toast({
+                title: "No Expiring Licenses",
+                description: "No licenses were found that are expiring in the next 4 months.",
+            });
+            setSuccessMessage("No licenses are due for an expiration notification at this time.")
+        }
+
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setError(`Failed to check for expirations: ${errorMessage}`);
+        toast({
+            title: "Error",
+            description: `Failed to check for expirations: ${errorMessage}`,
+            variant: "destructive",
+        });
+    } finally {
+        setIsNotifying(false);
+    }
+  }, [toast]);
+
 
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
@@ -439,7 +489,7 @@ const LicenseManagementPage: NextPage = () => {
               onChange={handleFileChange}
               className="flex-grow file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
               aria-label="Upload JSON file"
-              disabled={isLoading}
+              disabled={isLoading || isNotifying}
             />
             {fileName && !error && jsonInput && <p className="text-sm text-muted-foreground mt-1">Loaded file: {fileName}</p>}
           </div>
@@ -454,14 +504,14 @@ const LicenseManagementPage: NextPage = () => {
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
               aria-label="Paste JSON data"
-              disabled={isLoading}
+              disabled={isLoading || isNotifying}
             />
           </div>
         </CardContent>
         <CardFooter>
           <Button
             onClick={processJson}
-            disabled={isLoading || !jsonInput.trim()}
+            disabled={isLoading || isNotifying || !jsonInput.trim()}
             className="bg-accent hover:bg-accent/90 text-accent-foreground w-full md:w-auto rounded-md text-base py-3 px-6"
             aria-label="View JSON data as table"
           >
@@ -478,14 +528,14 @@ const LicenseManagementPage: NextPage = () => {
         </CardFooter>
       </Card>
 
-      {isLoading && (successMessage?.includes("database") || error?.includes("database") || (!jsonInput.trim() && !fileName && !tableData)) && (
+      {(isLoading || isNotifying) && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
             <div className="flex items-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <AlertTitle className="font-semibold text-blue-600">Processing Database Request</AlertTitle>
+                <AlertTitle className="font-semibold text-blue-600">{isNotifying ? "Checking Expirations..." : "Processing Database Request"}</AlertTitle>
             </div>
           <AlertDescription>Please wait...</AlertDescription>
         </Alert>
@@ -533,13 +583,23 @@ const LicenseManagementPage: NextPage = () => {
               <CardTitle className="text-2xl font-headline">License Data Table</CardTitle>
               <CardDescription>View, sort, and edit license data. 'id' is database-generated and not editable. Save changes to the database.</CardDescription>
             </div>
-            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-wrap justify-end">
+               <Button
+                onClick={handleNotify}
+                variant="outline"
+                className="border-orange-500 text-orange-500 hover:bg-orange-500/10 hover:text-orange-600 rounded-md w-full md:w-auto"
+                aria-label="Check for expiring licenses"
+                disabled={isLoading || isNotifying}
+              >
+                <BellRing className="mr-2 h-5 w-5" />
+                Check Expirations
+              </Button>
                <Button
                 onClick={saveDataToDB}
                 variant="default"
                 className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
                 aria-label="Save table data to database"
-                disabled={isLoading || !tableData || tableData.length === 0}
+                disabled={isLoading || isNotifying || !tableData || tableData.length === 0}
               >
                 <Save className="mr-2 h-5 w-5" />
                 Save to Database
@@ -549,7 +609,7 @@ const LicenseManagementPage: NextPage = () => {
                 variant="outline"
                 className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
                 aria-label="Add new row to table"
-                disabled={isLoading}
+                disabled={isLoading || isNotifying}
               >
                 <PlusCircle className="mr-2 h-5 w-5" />
                 Add Row
@@ -559,7 +619,7 @@ const LicenseManagementPage: NextPage = () => {
                 variant="outline"
                 className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
                 aria-label="Export table data to CSV"
-                disabled={isLoading || !sortedTableData || !sortedTableData.length}
+                disabled={isLoading || isNotifying || !sortedTableData || !sortedTableData.length}
               >
                 <Download className="mr-2 h-5 w-5" />
                 Export as CSV
@@ -611,7 +671,7 @@ const LicenseManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id') return;
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || isNotifying) return;
                              handleCellClick(rowIndex, headerKey);
                           }}
                         >
@@ -653,7 +713,7 @@ const LicenseManagementPage: NextPage = () => {
                             )
                           ) : (
                             <div
-                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
+                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying ? 'cursor-not-allowed' : ''}`}
                               title={getDisplayValue(row[headerKey])}
                             >
                               {getDisplayValue(row[headerKey])}
@@ -675,5 +735,3 @@ const LicenseManagementPage: NextPage = () => {
 };
 
 export default LicenseManagementPage;
-
-    
