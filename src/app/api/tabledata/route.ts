@@ -42,8 +42,6 @@ export async function POST(request: Request) {
       }
 
       return {
-	Scadenza: new Date(String(item.Scadenza) ?? ''), 
-        Rivenditore: String(item.Rivenditore ?? ''),
         Contratto: String(item.Contratto ?? ''),
         Produttore: String(item.Produttore ?? ''),
         Prodotto: String(item.Prodotto ?? ''),
@@ -51,7 +49,6 @@ export async function POST(request: Request) {
         Numero_Licenze: isNaN(numLicenze) ? 0 : numLicenze,
         Bundle: isNaN(bundleVal) ? 0 : bundleVal,
         Borrowable: item.Borrowable === true || String(item.Borrowable).toLowerCase() === 'true',
-        Contratto: String(item.Contratto ?? ''),
         Rivenditore: String(item.Rivenditore ?? ''),
         Scadenza: scadenzaDate,
       };
