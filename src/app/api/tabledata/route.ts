@@ -3,23 +3,17 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 
-// Helper to check if data is an array of objects, suitable for License model
-function isValidLicenseData(data: any): data is Partial<Omit<typeof prisma.license.fields, 'id'>>[] {
-  return Array.isArray(data) && data.every(item =>
-    typeof item === 'object' &&
-    item !== null &&
-    !Array.isArray(item) &&
-    'Produttore' in item && // Basic check for one of the fields
-    'Prodotto' in item
-  );
-}
-
 export async function GET() {
   try {
     const licenses = await prisma.license.findMany({
       orderBy: { id: 'asc' }, // Order by ID or any other preferred field
     });
-    return NextResponse.json(licenses);
+    // Format DateTime to ISO string without time for consistency
+    const formattedLicenses = licenses.map(license => ({
+        ...license,
+        Scadenza: license.Scadenza ? license.Scadenza.toISOString().split('T')[0] : null,
+    }));
+    return NextResponse.json(formattedLicenses);
   } catch (error) {
     console.error('Failed to fetch licenses:', error);
     return NextResponse.json({ message: 'Failed to fetch data from database' }, { status: 500 });
@@ -30,7 +24,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (!Array.isArray(body)) { // Looser check, Prisma will validate further
+    if (!Array.isArray(body)) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of license objects.' }, { status: 400 });
     }
 
@@ -39,6 +33,14 @@ export async function POST(request: Request) {
       const bundleVal = parseInt(String(item.Bundle), 10);
       //const date = new String(item.Scadenza);
       
+      let scadenzaDate: Date | null = null;
+      if (item.Scadenza && typeof item.Scadenza === 'string') {
+          const date = new Date(item.Scadenza);
+          if (!isNaN(date.getTime())) {
+              scadenzaDate = date;
+          }
+      }
+
       return {
 	Scadenza: new Date(String(item.Scadenza) ?? ''), 
         Rivenditore: String(item.Rivenditore ?? ''),
@@ -49,7 +51,9 @@ export async function POST(request: Request) {
         Numero_Licenze: isNaN(numLicenze) ? 0 : numLicenze,
         Bundle: isNaN(bundleVal) ? 0 : bundleVal,
         Borrowable: item.Borrowable === true || String(item.Borrowable).toLowerCase() === 'true',
-        // id is not included, it's auto-generated
+        Contratto: String(item.Contratto ?? ''),
+        Rivenditore: String(item.Rivenditore ?? ''),
+        Scadenza: scadenzaDate,
       };
     });
 
@@ -70,7 +74,6 @@ export async function POST(request: Request) {
     if (error instanceof SyntaxError) {
         return NextResponse.json({ message: 'Invalid JSON payload provided' }, { status: 400 });
     }
-    // Add more specific error handling for Prisma validation errors if needed
     return NextResponse.json({ message: 'Failed to save data to database. Ensure data matches the License model.' }, { status: 500 });
   }
 }

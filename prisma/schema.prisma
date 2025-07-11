@@ -1,23 +1,24 @@
-
-datasource db {
-  provider = "postgresql" // Or your chosen provider like "mysql", "sqlite"
-  url      = env("DATABASE_URL")
-}
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model License {
-  id             Int     @default(autoincrement()) @id
+  id             Int       @default(autoincrement()) @id
   Produttore     String
   Prodotto       String
   Tipo_Licenza   String
   Numero_Licenze Int
   Bundle         Int
   Borrowable     Boolean
-  Rivenditore    String
-  Contratto      String
-  Scadenza       DateTime
+  Contratto      String?
+  Rivenditore    String?
+  Scadenza       DateTime?
 }
