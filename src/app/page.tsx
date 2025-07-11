@@ -10,11 +10,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 type SortDirection = 'ascending' | 'descending';
@@ -28,7 +37,12 @@ interface EditingCell {
   headerKey: string;
 }
 
-const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Scadenza'];
+interface ResellerInfo {
+  name: string;
+  email: string;
+}
+
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Email_Rivenditore', 'Scadenza'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -77,6 +91,8 @@ const LicenseManagementPage: NextPage = () => {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [resellerInfo, setResellerInfo] = useState<ResellerInfo | null>(null);
+
 
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
@@ -337,6 +353,19 @@ const LicenseManagementPage: NextPage = () => {
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
     if (isLoading || headerKey === 'id') return;
+
+    if (headerKey === 'Rivenditore') {
+      if (!tableData) return;
+      const row = tableData[rowIndex];
+      if (row) {
+        setResellerInfo({
+          name: getDisplayValue(row.Rivenditore),
+          email: getDisplayValue(row.Email_Rivenditore),
+        });
+      }
+      return;
+    }
+
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
     }
@@ -371,8 +400,9 @@ const LicenseManagementPage: NextPage = () => {
     
     let currentHeaders = [...tableHeaders];
     if (currentHeaders.length === 0 || !LICENSE_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
+        const headersWithId = (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id'));
         currentHeaders = [...LICENSE_MODEL_HEADERS];
-        if (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id')) {
+        if (headersWithId) {
             currentHeaders.unshift('id');
         }
         setTableHeaders(currentHeaders);
@@ -420,7 +450,7 @@ const LicenseManagementPage: NextPage = () => {
               id="json-textarea"
               value={jsonInput}
               onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
-              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Scadenza": "2025-12-31"}]'
+              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Email_Rivenditore": "contact@resellerx.com", "Scadenza": "2025-12-31"}]'
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
               aria-label="Paste JSON data"
@@ -475,6 +505,25 @@ const LicenseManagementPage: NextPage = () => {
           <AlertTitle className="font-semibold text-primary">Success</AlertTitle>
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
+      )}
+
+      {resellerInfo && (
+        <AlertDialog open={!!resellerInfo} onOpenChange={(isOpen) => !isOpen && setResellerInfo(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Contact Information for {resellerInfo.name}</AlertDialogTitle>
+              <AlertDialogDescription>
+                <div className="flex items-center gap-2 pt-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{resellerInfo.email || "No email provided."}</span>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setResellerInfo(null)}>Close</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {tableData !== null && (
@@ -562,8 +611,8 @@ const LicenseManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                            if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id') return;
-                            handleCellClick(rowIndex, headerKey);
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id') return;
+                             handleCellClick(rowIndex, headerKey);
                           }}
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
@@ -626,3 +675,5 @@ const LicenseManagementPage: NextPage = () => {
 };
 
 export default LicenseManagementPage;
+
+    

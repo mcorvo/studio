@@ -31,7 +31,6 @@ export async function POST(request: Request) {
     const dataToCreate = body.map(item => {
       const numLicenze = parseInt(String(item.Numero_Licenze), 10);
       const bundleVal = parseInt(String(item.Bundle), 10);
-      //const date = new String(item.Scadenza);
       
       let scadenzaDate: Date | null = null;
       if (item.Scadenza && typeof item.Scadenza === 'string') {
@@ -50,6 +49,7 @@ export async function POST(request: Request) {
         Bundle: isNaN(bundleVal) ? 0 : bundleVal,
         Borrowable: item.Borrowable === true || String(item.Borrowable).toLowerCase() === 'true',
         Rivenditore: String(item.Rivenditore ?? ''),
+        Email_Rivenditore: String(item.Email_Rivenditore ?? ''),
         Scadenza: scadenzaDate,
       };
     });
@@ -74,3 +74,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Failed to save data to database. Ensure data matches the License model.' }, { status: 500 });
   }
 }
+
+    
