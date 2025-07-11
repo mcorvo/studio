@@ -37,8 +37,12 @@ export async function POST(request: Request) {
     const dataToCreate = body.map(item => {
       const numLicenze = parseInt(String(item.Numero_Licenze), 10);
       const bundleVal = parseInt(String(item.Bundle), 10);
+      //const date = new String(item.Scadenza);
       
       return {
+	Scadenza: new Date(String(item.Scadenza) ?? ''), 
+        Rivenditore: String(item.Rivenditore ?? ''),
+        Contratto: String(item.Contratto ?? ''),
         Produttore: String(item.Produttore ?? ''),
         Prodotto: String(item.Prodotto ?? ''),
         Tipo_Licenza: String(item.Tipo_Licenza ?? ''),
