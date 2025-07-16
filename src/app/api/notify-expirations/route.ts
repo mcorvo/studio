@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
-import { notifyExpiringLicenses, NotifyExpiringLicensesOutput } from '@/ai/flows/notify-expirations-flow';
+import { NotifyExpiringLicensesOutput } from '@/ai/flows/notifyExpiringLicensesTypes';
+import { notifyExpiringLicenses } from '@/ai/flows/notify-expirations-flow';
 
 export const dynamic = 'force-dynamic'; // defaults to auto
 
