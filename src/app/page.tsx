@@ -89,8 +89,8 @@ const UnauthenticatedScreen = () => (
                 <CardDescription className="text-muted-foreground">Please sign in to manage license data.</CardDescription>
             </CardHeader>
             <CardContent>
-                <Button onClick={() => signIn("google")} className="w-full text-lg py-6 bg-accent hover:bg-accent/90">
-                    <LogIn className="mr-2 h-5 w-5" /> Sign In with Google
+                <Button onClick={() => signIn("keycloak")} className="w-full text-lg py-6 bg-accent hover:bg-accent/90">
+                    <LogIn className="mr-2 h-5 w-5" /> Sign In
                 </Button>
             </CardContent>
         </Card>
