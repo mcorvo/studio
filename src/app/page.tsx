@@ -3,6 +3,7 @@
 
 import { useState, useMemo, ChangeEvent, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
 import type { NextPage } from 'next';
+import { useSession, signIn, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -80,7 +81,24 @@ const getDisplayValue = (value: any): string => {
   return String(value);
 };
 
+const UnauthenticatedScreen = () => (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader className="text-center">
+                <CardTitle className="text-3xl font-bold text-primary">Welcome</CardTitle>
+                <CardDescription className="text-muted-foreground">Please sign in to manage license data.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={() => signIn("google")} className="w-full text-lg py-6 bg-accent hover:bg-accent/90">
+                    <LogIn className="mr-2 h-5 w-5" /> Sign In with Google
+                </Button>
+            </CardContent>
+        </Card>
+    </div>
+);
+
 const LicenseManagementPage: NextPage = () => {
+  const { data: session, status } = useSession();
   const [jsonInput, setJsonInput] = useState<string>('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [tableData, setTableData] = useState<any[] | null>(null);
@@ -88,7 +106,7 @@ const LicenseManagementPage: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isNotifying, setIsNotifying] = useState<boolean>(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
@@ -130,8 +148,10 @@ const LicenseManagementPage: NextPage = () => {
   }, []);
 
   useEffect(() => {
-    loadDataFromDB();
-  }, [loadDataFromDB]);
+    if (status === "authenticated") {
+        loadDataFromDB();
+    }
+  }, [status, loadDataFromDB]);
 
 
   const saveDataToDB = useCallback(async () => {
@@ -463,12 +483,32 @@ const LicenseManagementPage: NextPage = () => {
     }
   }, [toast]);
 
+  if (status === "loading") {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <svg className="animate-spin h-10 w-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      );
+  }
+
+  if (status === "unauthenticated") {
+      return <UnauthenticatedScreen />;
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
-        <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add license rows, and persist data to a database.</p>
+      <header className="mb-8 flex justify-between items-center">
+        <div className="text-center flex-grow">
+            <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
+            <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add license rows, and persist data to a database.</p>
+        </div>
+        <Button onClick={() => signOut()} variant="outline">
+            <LogOut className="mr-2 h-5 w-5" />
+            Sign Out
+        </Button>
       </header>
 
       <Card className="mb-8 shadow-lg rounded-xl">
@@ -528,7 +568,7 @@ const LicenseManagementPage: NextPage = () => {
         </CardFooter>
       </Card>
 
-      {(isLoading || isNotifying) && (
+      {(isLoading && status === 'authenticated') && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
             <div className="flex items-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
