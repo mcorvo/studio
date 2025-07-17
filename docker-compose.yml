@@ -1,8 +1,11 @@
 services:
   licensemgr:
-    image: server-4:latest
+    image: server-firebase-devel:latest
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=https://lm-mathcad.infn.it
   db:
     image: postgres
     restart: always
@@ -18,7 +21,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - 5432:5432
+      - '127.0.0.1:5432:5432'
 
         #  adminer:
         #    image: adminer

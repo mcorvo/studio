@@ -49,7 +49,7 @@ const notifyExpiringLicensesFlow = ai.defineFlow(
                 const { output: emailContent } = await emailPrompt({
                     Prodotto: license.Prodotto,
                     Scadenza: format(license.Scadenza!, 'yyyy-MM-dd'),
-                    Rivenditore: license.Rivenditore,
+                    Rivenditore: license.Rivenditore!,
                     Email_Rivenditore: license.Email_Rivenditore,
                 });
 
