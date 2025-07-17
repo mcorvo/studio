@@ -24,35 +24,27 @@ export const NotifyExpiringLicensesOutputSchema = z.object({
 });
 export type NotifyExpiringLicensesOutput = z.infer<typeof NotifyExpiringLicensesOutputSchema>;
 
-const EmailGenInputSchema = z.object({
-    Prodotto: z.string(),
-    Scadenza: z.string(),
-    Rivenditore: z.string(),
-    Email_Rivenditore: z.string().email(),
-});
-
-const EmailGenOutputSchema = z.object({
-    subject: z.string(),
-    body: z.string(),
-});
-
-const emailPrompt = ai.definePrompt({
-    name: 'notifyExpirationEmailPrompt',
-    input: { schema: EmailGenInputSchema },
-    output: { schema: EmailGenOutputSchema },
-    prompt: `You are an assistant responsible for writing professional email notifications about expiring software licenses.
-    The tone should be helpful and urgent, but not alarming.
-    The email should be sent to the reseller.
-    The license for the product "{{Prodotto}}" will expire on {{Scadenza}}.
-    The reseller is "{{Rivenditore}}".
+function createEmailContent(license: { Prodotto: string; Scadenza: Date | null; Rivenditore: string; }) {
+    const expirationDate = license.Scadenza ? format(license.Scadenza, 'yyyy-MM-dd') : 'N/A';
     
-    Generate a subject and a body for the email to be sent to {{Email_Rivenditore}}.
-    The body should be in HTML format.
-    The subject should clearly state the product and that its license is expiring soon.
-    The body should mention the product name, the expiration date, and suggest that the reseller contact their client to arrange for a renewal.
-    `,
-});
+    const subject = `License Expiration Notice for ${license.Prodotto}`;
+    
+    const body = `
+Dear ${license.Rivenditore},
 
+This is a notification that the software license for the following product is expiring soon:
+
+Product: ${license.Prodotto}
+Expiration Date: ${expirationDate}
+
+Please contact your client to arrange for a renewal.
+
+Thank you,
+License Management System
+    `.trim();
+
+    return { subject, body };
+}
 
 export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOutput> {
   return notifyExpiringLicensesFlow();
@@ -86,22 +78,15 @@ const notifyExpiringLicensesFlow = ai.defineFlow(
     for (const license of expiringLicenses) {
         if (license.Email_Rivenditore) {
             try {
-                const { output: emailContent } = await emailPrompt({
-                    Prodotto: license.Prodotto,
-                    Scadenza: format(license.Scadenza!, 'yyyy-MM-dd'),
-                    Rivenditore: license.Rivenditore,
-                    Email_Rivenditore: license.Email_Rivenditore,
-                });
+                const emailContent = createEmailContent(license);
 
-                if (emailContent) {
-                    output.sentEmails.push({
-                        recipient: license.Email_Rivenditore,
-                        subject: emailContent.subject,
-                        body: emailContent.body,
-                        licenseId: license.id,
-                        product: license.Prodotto,
-                    });
-                }
+                output.sentEmails.push({
+                    recipient: license.Email_Rivenditore,
+                    subject: emailContent.subject,
+                    body: emailContent.body,
+                    licenseId: license.id,
+                    product: license.Prodotto,
+                });
             } catch (error) {
                  const errorMessage = error instanceof Error ? error.message : String(error);
                  output.errors.push(`Failed to generate email for license ID ${license.id}: ${errorMessage}`);
