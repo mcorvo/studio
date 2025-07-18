@@ -14,9 +14,9 @@ import { format } from 'date-fns';
 import { NotifyExpiringLicensesOutputSchema, EmailGenInputSchema, EmailGenOutputSchema, emailPrompt } from './notifyExpiringLicensesTypes';
 import type { NotifyExpiringLicensesOutput } from './notifyExpiringLicensesTypes';
 
-export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOutput> {
-  return notifyExpiringLicensesFlow();
-}
+//export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOutput> {
+//  return notifyExpiringLicensesFlow();
+//}
 
 function createEmailContent(license: { Prodotto: string; Scadenza: Date | null; Rivenditore: string | null; }) {
     const expirationDate = license.Scadenza ? format(license.Scadenza, 'yyyy-MM-dd') : 'N/A';
@@ -38,6 +38,50 @@ License Management System
     `.trim();
 
     return { subject, body };
+}
+
+export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOutput> {
+  const recipient: string = process.env.EMAIL_RECIPIENT!;
+  const today = new Date();
+  const fourMonthsFromNow = new Date();
+  fourMonthsFromNow.setMonth(today.getMonth() + 4);
+
+  const expiringLicenses = await prisma.license.findMany({
+    where: {
+      Scadenza: {
+        gte: today,
+        lte: fourMonthsFromNow,
+      },
+      Email_Rivenditore: {
+        not: null,
+        contains: '@',
+      }
+    },
+  });
+
+  const output: NotifyExpiringLicensesOutput = { sentEmails: [], errors: [] };
+
+  for (const license of expiringLicenses) {
+    if (process.env.EMAIL_RECIPIENT) {
+      try {
+            const emailContent = createEmailContent(license);
+
+            output.sentEmails.push({
+              recipient: process.env.EMAIL_RECIPIENT,
+              subject: emailContent.subject,
+              body: emailContent.body,
+              licenseId: license.id,
+              product: license.Prodotto,
+            });
+            await sendEmail({ to: process.env.EMAIL_RECIPIENT, subject: emailContent.subject, html: emailContent.body});
+
+      } catch (error) {
+             const errorMessage = error instanceof Error ? error.message : String(error);
+             output.errors.push(`Failed to generate email for license ID ${license.id}: ${errorMessage}`);
+      }
+    }
+  }
+  return output;
 }
 
 const notifyExpiringLicensesFlow = ai.defineFlow(
@@ -80,7 +124,7 @@ const notifyExpiringLicensesFlow = ai.defineFlow(
                     product: license.Prodotto,
                 });
                 await sendEmail({ to: process.env.EMAIL_RECIPIENT, subject: emailContent.subject, html: emailContent.body});
-                
+
             } catch (error) {
                  const errorMessage = error instanceof Error ? error.message : String(error);
                  output.errors.push(`Failed to generate email for license ID ${license.id}: ${errorMessage}`);
