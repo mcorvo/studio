@@ -447,7 +447,11 @@ const LicenseManagementPage: NextPage = () => {
     });
 
     try {
-        const response = await fetch('/api/notify-expirations');
+        const response = await fetch('/api/notify-expirations', {
+            headers: {
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET}`
+            }
+        });
         const result = await response.json();
 
         if (!response.ok) {

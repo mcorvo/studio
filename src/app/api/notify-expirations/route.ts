@@ -10,11 +10,10 @@ export const dynamic = 'force-dynamic'; // defaults to auto
 // A simple way is to use a "cron secret" that must be passed in the request.
 
 export async function GET(request: Request) {
-    // Example of securing with a secret:
-    // const cronSecret = request.headers.get('Authorization')?.replace('Bearer ', '');
-    // if (cronSecret !== process.env.CRON_SECRET) {
-    //     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    // }
+    const cronSecret = request.headers.get('Authorization')?.replace('Bearer ', '');
+    if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
 
     try {
         const result: NotifyExpiringLicensesOutput = await notifyExpiringLicenses();
