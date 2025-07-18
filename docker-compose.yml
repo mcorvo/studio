@@ -1,6 +1,6 @@
 services:
   licensemgr:
-    image: server-firebase-devel:latest
+    image: fix-email-me:latest
     ports:
       - '127.0.0.1:3000:3000'
     environment:

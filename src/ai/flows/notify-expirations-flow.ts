@@ -9,12 +9,35 @@
 
 import { ai } from '@/ai/genkit';
 import prisma from '@/lib/prisma';
+import { sendEmail } from '@/lib/email';
 import { format } from 'date-fns';
 import { NotifyExpiringLicensesOutputSchema, EmailGenInputSchema, EmailGenOutputSchema, emailPrompt } from './notifyExpiringLicensesTypes';
 import type { NotifyExpiringLicensesOutput } from './notifyExpiringLicensesTypes';
 
 export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOutput> {
   return notifyExpiringLicensesFlow();
+}
+
+function createEmailContent(license: { Prodotto: string; Scadenza: Date | null; Rivenditore: string | null; }) {
+    const expirationDate = license.Scadenza ? format(license.Scadenza, 'yyyy-MM-dd') : 'N/A';
+    
+    const subject = `License Expiration Notice for ${license.Prodotto}`;
+    
+    const body = `
+Dear ${license.Rivenditore},
+
+This is a notification that the software license for the following product is expiring soon:
+
+Product: ${license.Prodotto}
+Expiration Date: ${expirationDate}
+
+Please contact your client to arrange for a renewal.
+
+Thank you,
+License Management System
+    `.trim();
+
+    return { subject, body };
 }
 
 const notifyExpiringLicensesFlow = ai.defineFlow(
@@ -42,26 +65,22 @@ const notifyExpiringLicensesFlow = ai.defineFlow(
     });
 
     const output: NotifyExpiringLicensesOutput = { sentEmails: [], errors: [] };
-    
-    for (const license of expiringLicenses) {
-        if (license.Email_Rivenditore) {
-            try {
-                const { output: emailContent } = await emailPrompt({
-                    Prodotto: license.Prodotto,
-                    Scadenza: format(license.Scadenza!, 'yyyy-MM-dd'),
-                    Rivenditore: license.Rivenditore!,
-                    Email_Rivenditore: license.Email_Rivenditore,
-                });
+    //let emailContent: { subject: string, body: string };
 
-                if (emailContent) {
-                    output.sentEmails.push({
-                        recipient: license.Email_Rivenditore,
-                        subject: emailContent.subject,
-                        body: emailContent.body,
-                        licenseId: license.id,
-                        product: license.Prodotto,
-                    });
-                }
+    for (const license of expiringLicenses) {
+        if (process.env.EMAIL_RECIPIENT) {
+          try {
+                const emailContent = createEmailContent(license);
+
+                output.sentEmails.push({
+                    recipient: process.env.EMAIL_RECIPIENT,
+                    subject: emailContent.subject,
+                    body: emailContent.body,
+                    licenseId: license.id,
+                    product: license.Prodotto,
+                });
+                await sendEmail({ to: process.env.EMAIL_RECIPIENT, subject: emailContent.subject, html: emailContent.body});
+                
             } catch (error) {
                  const errorMessage = error instanceof Error ? error.message : String(error);
                  output.errors.push(`Failed to generate email for license ID ${license.id}: ${errorMessage}`);
