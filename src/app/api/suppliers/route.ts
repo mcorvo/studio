@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
@@ -6,8 +7,19 @@ export async function GET() {
   try {
     const suppliers = await prisma.supplier.findMany({
       orderBy: { id: 'asc' },
+      include: {
+          licenses: {
+            include: {
+                license: true
+            }
+          }
+      }
     });
-    return NextResponse.json(suppliers);
+    const formattedSuppliers = suppliers.map(s => ({
+        ...s,
+        licenses: s.licenses.length // Return a count for now
+    }));
+    return NextResponse.json(formattedSuppliers);
   } catch (error) {
     console.error('Failed to fetch suppliers:', error);
     return NextResponse.json({ message: 'Failed to fetch data from database' }, { status: 500 });
@@ -31,10 +43,14 @@ export async function POST(request: Request) {
         email: String(item.email ?? ''),
         link_rda: String(item.link_rda ?? ''),
         fornitore_unico: item.fornitore_unico === true || String(item.fornitore_unico).toLowerCase() === 'true',
+        Prodotto: String(item.Prodotto ?? ''),
       };
     });
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // More complex logic is needed to handle relations.
+      // For now, we will just delete and create suppliers without touching relations.
+      await tx.licensesOnSuppliers.deleteMany({});
       await tx.supplier.deleteMany({}); // Clear all existing supplier entries
 
       if (dataToCreate.length > 0) {

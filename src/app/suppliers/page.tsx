@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, ChangeEvent, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
@@ -24,7 +25,7 @@ interface EditingCell {
   headerKey: string;
 }
 
-const SUPPLIER_MODEL_HEADERS = ['fornitore', 'anno', 'email', 'link_rda', 'fornitore_unico'];
+const SUPPLIER_MODEL_HEADERS = ['fornitore', 'anno', 'email', 'link_rda', 'fornitore_unico', 'Prodotto', 'licenses'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -167,7 +168,7 @@ const SupplierManagementPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
-    if (key === 'id') return;
+    if (key === 'id' || key === 'licenses') return;
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -189,9 +190,9 @@ const SupplierManagementPage: NextPage = () => {
     
     let parsedNewValue: any = currentEditValue;
     
-    if (headerKey === 'anno') {
+    if (headerKey === 'anno' || headerKey === 'licenses') {
       const num = parseInt(currentEditValue, 10);
-      parsedNewValue = isNaN(num) ? new Date().getFullYear() : num;
+      parsedNewValue = isNaN(num) ? ((headerKey === 'anno') ? new Date().getFullYear() : 0) : num;
     } else if (headerKey === 'fornitore_unico') {
       parsedNewValue = currentEditValue.toLowerCase() === 'true';
     }
@@ -211,7 +212,7 @@ const SupplierManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id') return;
+    if (isLoading || headerKey === 'id' || headerKey === 'licenses') return;
 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
@@ -232,6 +233,9 @@ const SupplierManagementPage: NextPage = () => {
         switch(header) {
             case 'anno':
                 newRow[header] = new Date().getFullYear();
+                break;
+            case 'licenses':
+                newRow[header] = 0;
                 break;
             case 'fornitore_unico':
                 newRow[header] = false;
@@ -375,16 +379,16 @@ const SupplierManagementPage: NextPage = () => {
                       <TableHead
                         key={headerKey}
                         onClick={() => requestSort(headerKey)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' ? 'cursor-default' : ''}`}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' || headerKey === 'licenses' ? 'cursor-default' : ''}`}
                         aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
-                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : `Sort by ${headerKey}`}
+                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : (headerKey === 'licenses' ? 'Associated licenses (not sortable/editable)' : `Sort by ${headerKey}`)}
                       >
                         <div className="flex items-center gap-1">
                           {headerKey.replace(/_/g, ' ')}
-                          {headerKey !== 'id' && sortConfig?.key === headerKey ? (
+                          {headerKey !== 'id' && headerKey !== 'licenses' && sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
-                           headerKey !== 'id' && <ArrowUpDown className="h-4 w-4 opacity-30" />
+                           headerKey !== 'id' && headerKey !== 'licenses' && <ArrowUpDown className="h-4 w-4 opacity-30" />
                           )}
                         </div>
                       </TableHead>
@@ -402,7 +406,7 @@ const SupplierManagementPage: NextPage = () => {
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
                               <Input
-                                type={headerKey === 'anno' ? 'number' : 'text'}
+                                type={headerKey === 'anno' || headerKey === 'licenses' ? 'number' : 'text'}
                                 value={currentEditValue}
                                 onChange={(e) => setCurrentEditValue(e.target.value)}
                                 onBlurCapture={handleSaveEdit}
@@ -412,7 +416,7 @@ const SupplierManagementPage: NextPage = () => {
                               />
                           ) : (
                             <div
-                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
+                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'licenses' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                               title={getDisplayValue(row[headerKey])}
                             >
                               {getDisplayValue(row[headerKey])}

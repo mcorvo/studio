@@ -45,7 +45,7 @@ interface ResellerInfo {
   email: string;
 }
 
-const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Email_Rivenditore', 'Scadenza'];
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Email_Rivenditore', 'Scadenza', 'suppliers'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -241,7 +241,7 @@ const LicenseManagementPage: NextPage = () => {
           if (typeof item !== 'object' || item === null) return { value: item };
           const newItem: any = {};
           LICENSE_MODEL_HEADERS.forEach(header => {
-            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'Borrowable' ? false : ''));
+            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' || header === 'suppliers' ? 0 : (header === 'Borrowable' ? false : ''));
           });
           if (item.id) newItem.id = item.id;
           return newItem;
@@ -275,7 +275,7 @@ const LicenseManagementPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
-    if (key === 'id') return;
+    if (key === 'id' || key === 'suppliers') return;
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -338,7 +338,7 @@ const LicenseManagementPage: NextPage = () => {
         try {
           if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
              parsedNewValue = "";
-          } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
+          } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle' || headerKey === 'suppliers') {
             const num = parseInt(currentEditValue, 10);
             parsedNewValue = isNaN(num) ? (originalValue || 0) : num;
           } else if (headerKey === 'Borrowable') {
@@ -376,7 +376,7 @@ const LicenseManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id') return;
+    if (isLoading || headerKey === 'id' || headerKey === 'suppliers') return;
 
     if (headerKey === 'Rivenditore') {
       if (!tableData) return;
@@ -409,6 +409,7 @@ const LicenseManagementPage: NextPage = () => {
         switch(header) {
             case 'Numero_Licenze':
             case 'Bundle':
+            case 'suppliers':
                 newRow[header] = 0;
                 break;
             case 'Borrowable':
@@ -700,16 +701,16 @@ const LicenseManagementPage: NextPage = () => {
                       <TableHead
                         key={headerKey}
                         onClick={() => requestSort(headerKey)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' ? 'cursor-default' : ''}`}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' || headerKey === 'suppliers' ? 'cursor-default' : ''}`}
                         aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
-                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : `Sort by ${headerKey}`}
+                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : (headerKey === 'suppliers' ? 'Associated suppliers (not sortable/editable)' : `Sort by ${headerKey}`)}
                       >
                         <div className="flex items-center gap-1">
                           {headerKey}
-                          {headerKey !== 'id' && sortConfig?.key === headerKey ? (
+                          {headerKey !== 'id' && headerKey !== 'suppliers' && sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
-                           headerKey !== 'id' && <ArrowUpDown className="h-4 w-4 opacity-30" />
+                           headerKey !== 'id' && headerKey !== 'suppliers' && <ArrowUpDown className="h-4 w-4 opacity-30" />
                           )}
                         </div>
                       </TableHead>
@@ -724,7 +725,7 @@ const LicenseManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || isNotifying) return;
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || headerKey === 'suppliers' || isNotifying) return;
                              handleCellClick(rowIndex, headerKey);
                           }}
                         >
@@ -766,7 +767,7 @@ const LicenseManagementPage: NextPage = () => {
                             )
                           ) : (
                             <div
-                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying ? 'cursor-not-allowed' : ''}`}
+                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'suppliers' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying ? 'cursor-not-allowed' : ''}`}
                               title={getDisplayValue(row[headerKey])}
                             >
                               {getDisplayValue(row[headerKey])}

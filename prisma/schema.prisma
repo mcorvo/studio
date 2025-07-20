@@ -1,37 +1,46 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client-js"
-}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
+
 model License {
-  id                Int      @default(autoincrement()) @id
+  id                Int     @default(autoincrement()) @id
+  Contratto         String?
   Produttore        String
   Prodotto          String
   Tipo_Licenza      String
   Numero_Licenze    Int
   Bundle            Int
   Borrowable        Boolean
-  Contratto         String?
   Rivenditore       String?
-  Scadenza          DateTime?
   Email_Rivenditore String?
+  Scadenza          DateTime?
+  suppliers         LicensesOnSuppliers[]
 }
 
 model Supplier {
-  id              Int     @id @default(autoincrement())
+  id              Int      @default(autoincrement()) @id
   fornitore       String
   anno            Int
-  email           String  @unique
-  link_rda        String
+  email           String?
+  link_rda        String?
   fornitore_unico Boolean
+  Prodotto        String?
+  licenses        LicensesOnSuppliers[]
+}
+
+model LicensesOnSuppliers {
+  license    License  @relation(fields: [licenseId], references: [id])
+  licenseId  Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  supplierId Int
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  @@id([licenseId, supplierId])
 }
