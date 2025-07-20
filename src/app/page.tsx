@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Link from 'next/link';
 
 
 type SortDirection = 'ascending' | 'descending';
@@ -447,7 +448,11 @@ const LicenseManagementPage: NextPage = () => {
     });
 
     try {
-        const response = await fetch('/api/notify-expirations');
+        const response = await fetch('/api/notify-expirations', {
+            headers: {
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET}`
+            }
+        });
         const result = await response.json();
 
         if (!response.ok) {
@@ -461,7 +466,7 @@ const LicenseManagementPage: NextPage = () => {
                 description: `Successfully generated ${emailCount} email(s) for expiring licenses.`,
                 variant: "default",
             });
-            setSuccessMessage(`Successfully generated ${emailCount} email(s). Note: This mock-up generates email content but does not send them.`)
+            setSuccessMessage(`Successfully generated ${emailCount} email(s). Emails are sent to the configured recipient.`)
         } else {
              toast({
                 title: "No Expiring Licenses",
@@ -505,10 +510,18 @@ const LicenseManagementPage: NextPage = () => {
             <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
             <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add license rows, and persist data to a database.</p>
         </div>
-        <Button onClick={() => signOut()} variant="outline">
-            <LogOut className="mr-2 h-5 w-5" />
-            Sign Out
-        </Button>
+        <div className="flex items-center gap-4">
+            <Link href="/suppliers" passHref>
+                <Button variant="outline">
+                    Manage Suppliers
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+            </Link>
+            <Button onClick={() => signOut()} variant="outline">
+                <LogOut className="mr-2 h-5 w-5" />
+                Sign Out
+            </Button>
+        </div>
       </header>
 
       <Card className="mb-8 shadow-lg rounded-xl">
