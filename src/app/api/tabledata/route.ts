@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of license objects.' }, { status: 400 });
     }
 
-    const dataToCreate = body.map(item => {
+    const licensesToCreate = body.map(item => {
       const numLicenze = parseInt(String(item.Numero_Licenze), 10);
       const bundleVal = parseInt(String(item.Bundle), 10);
       
@@ -59,22 +59,37 @@ export async function POST(request: Request) {
         Rivenditore: String(item.Rivenditore ?? ''),
         Email_Rivenditore: String(item.Email_Rivenditore ?? ''),
         Scadenza: scadenzaDate,
-        // Note: Handling suppliers relation on POST would require more complex logic
-        // For simplicity, we are not handling it here. You would typically handle relations separately.
       };
     });
 
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // More complex logic is needed to handle relations.
-      // For now, we will just delete and create licenses without touching relations.
+    await prisma.$transaction(async (tx) => {
       await tx.licensesOnSuppliers.deleteMany({});
-      await tx.license.deleteMany({}); // Clear all existing license entries
+      await tx.license.deleteMany({});
 
-      if (dataToCreate.length > 0) {
+      if (licensesToCreate.length > 0) {
         await tx.license.createMany({
-          data: dataToCreate,
+          data: licensesToCreate,
         });
+
+        // After creation, link them up
+        const createdLicenses = await tx.license.findMany();
+        const allSuppliers = await tx.supplier.findMany();
+        
+        // Create a map for quick supplier lookup by their name
+        const supplierMap = new Map(allSuppliers.map(s => [s.fornitore, s.id]));
+
+        for (const license of createdLicenses) {
+            if (license.Rivenditore && supplierMap.has(license.Rivenditore)) {
+                const supplierId = supplierMap.get(license.Rivenditore)!;
+                await tx.licensesOnSuppliers.create({
+                    data: {
+                        licenseId: license.id,
+                        supplierId: supplierId,
+                    }
+                });
+            }
+        }
       }
     });
 

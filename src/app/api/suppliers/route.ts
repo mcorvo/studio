@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of supplier objects.' }, { status: 400 });
     }
 
-    const dataToCreate = body.map(item => {
+    const suppliersToCreate = body.map(item => {
       const anno = parseInt(String(item.anno), 10);
       
       return {
@@ -47,16 +47,31 @@ export async function POST(request: Request) {
       };
     });
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // More complex logic is needed to handle relations.
-      // For now, we will just delete and create suppliers without touching relations.
+    await prisma.$transaction(async (tx) => {
       await tx.licensesOnSuppliers.deleteMany({});
-      await tx.supplier.deleteMany({}); // Clear all existing supplier entries
+      await tx.supplier.deleteMany({});
 
-      if (dataToCreate.length > 0) {
+      if (suppliersToCreate.length > 0) {
         await tx.supplier.createMany({
-          data: dataToCreate,
+          data: suppliersToCreate,
         });
+
+        const createdSuppliers = await tx.supplier.findMany();
+        const allLicenses = await tx.license.findMany();
+        
+        const licenseMap = new Map(allLicenses.map(l => [l.Prodotto, l.id]));
+
+        for (const supplier of createdSuppliers) {
+            if (supplier.Prodotto && licenseMap.has(supplier.Prodotto)) {
+                const licenseId = licenseMap.get(supplier.Prodotto)!;
+                await tx.licensesOnSuppliers.create({
+                    data: {
+                        licenseId: licenseId,
+                        supplierId: supplier.id,
+                    }
+                });
+            }
+        }
       }
     });
 
