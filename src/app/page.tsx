@@ -40,11 +40,6 @@ interface EditingCell {
   headerKey: string;
 }
 
-interface ResellerInfo {
-  name: string;
-  email: string;
-}
-
 const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Email_Rivenditore', 'Scadenza', 'suppliers'];
 
 const getAllKeys = (data: any[]): string[] => {
@@ -112,7 +107,6 @@ const LicenseManagementPage: NextPage = () => {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [resellerInfo, setResellerInfo] = useState<ResellerInfo | null>(null);
   const { toast } = useToast();
 
 
@@ -378,18 +372,6 @@ const LicenseManagementPage: NextPage = () => {
   const handleCellClick = (rowIndex: number, headerKey: string) => {
     if (isLoading || headerKey === 'id' || headerKey === 'suppliers') return;
 
-    if (headerKey === 'Rivenditore') {
-      if (!tableData) return;
-      const row = tableData[rowIndex];
-      if (row) {
-        setResellerInfo({
-          name: getDisplayValue(row.Rivenditore),
-          email: getDisplayValue(row.Email_Rivenditore),
-        });
-      }
-      return;
-    }
-
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
     }
@@ -609,25 +591,6 @@ const LicenseManagementPage: NextPage = () => {
           <AlertTitle className="font-semibold text-primary">Success</AlertTitle>
           <AlertDescription>{successMessage}</AlertDescription>
         </Alert>
-      )}
-
-      {resellerInfo && (
-        <AlertDialog open={!!resellerInfo} onOpenChange={(isOpen) => !isOpen && setResellerInfo(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Contact Information for {resellerInfo.name}</AlertDialogTitle>
-              <AlertDialogDescription>
-                <div className="flex items-center gap-2 pt-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{resellerInfo.email || "No email provided."}</span>
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => setResellerInfo(null)}>Close</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       )}
 
       {tableData !== null && (
