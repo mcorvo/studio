@@ -507,7 +507,7 @@ const LicenseManagementPage: NextPage = () => {
         </div>
       </header>
 
-      <Card className="mb-8 shadow-lg rounded-xl">
+      {/*<Card className="mb-8 shadow-lg rounded-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl font-headline">
             <FileJsonIcon className="text-primary w-7 h-7" />
@@ -562,7 +562,7 @@ const LicenseManagementPage: NextPage = () => {
             ) : "View Table from Input"}
           </Button>
         </CardFooter>
-      </Card>
+      </Card> */}
 
       {(isLoading && status === 'authenticated') && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
