@@ -17,7 +17,7 @@ export async function GET() {
     });
     const formattedSuppliers = suppliers.map(s => ({
         ...s,
-        licenses: s.licenses.length // Return a count for now
+        licenses: s.licenses.map(l => l.license)
     }));
     return NextResponse.json(formattedSuppliers);
   } catch (error) {

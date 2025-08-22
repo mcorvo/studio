@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, LogOut, ArrowLeft, Building } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, LogOut, ArrowLeft, Building, FileText } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
 
@@ -43,6 +44,9 @@ const getAllKeys = (data: any[]): string[] => {
 };
 
 const getDisplayValue = (value: any): string => {
+  if (Array.isArray(value)) {
+    return `${value.length}`;
+  }
   if (typeof value === 'boolean') {
     return value.toString();
   }
@@ -190,9 +194,9 @@ const SupplierManagementPage: NextPage = () => {
     
     let parsedNewValue: any = currentEditValue;
     
-    if (headerKey === 'anno' || headerKey === 'licenses') {
+    if (headerKey === 'anno') {
       const num = parseInt(currentEditValue, 10);
-      parsedNewValue = isNaN(num) ? ((headerKey === 'anno') ? new Date().getFullYear() : 0) : num;
+      parsedNewValue = isNaN(num) ? (new Date().getFullYear()) : num;
     } else if (headerKey === 'fornitore_unico') {
       parsedNewValue = currentEditValue.toLowerCase() === 'true';
     }
@@ -235,7 +239,7 @@ const SupplierManagementPage: NextPage = () => {
                 newRow[header] = new Date().getFullYear();
                 break;
             case 'licenses':
-                newRow[header] = 0;
+                newRow[header] = [];
                 break;
             case 'fornitore_unico':
                 newRow[header] = false;
@@ -402,11 +406,14 @@ const SupplierManagementPage: NextPage = () => {
                         <TableCell
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
-                          onClickCapture={() => handleCellClick(rowIndex, headerKey)}
+                          onClickCapture={(e) => {
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || headerKey === 'licenses') return;
+                             handleCellClick(rowIndex, headerKey);
+                          }}
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
                               <Input
-                                type={headerKey === 'anno' || headerKey === 'licenses' ? 'number' : 'text'}
+                                type={headerKey === 'anno' ? 'number' : 'text'}
                                 value={currentEditValue}
                                 onChange={(e) => setCurrentEditValue(e.target.value)}
                                 onBlurCapture={handleSaveEdit}
@@ -415,12 +422,52 @@ const SupplierManagementPage: NextPage = () => {
                                 className="h-full w-full p-3 border-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 rounded-none box-border bg-background/80"
                               />
                           ) : (
-                            <div
-                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'licenses' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
-                              title={getDisplayValue(row[headerKey])}
-                            >
-                              {getDisplayValue(row[headerKey])}
-                            </div>
+                             headerKey === 'licenses' && Array.isArray(row[headerKey]) && row[headerKey].length > 0 ? (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <div className="p-3 w-full h-full box-border min-h-[2.5rem] flex items-center cursor-pointer hover:bg-muted/30">
+                                           <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                                           {getDisplayValue(row[headerKey])}
+                                        </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto max-w-2xl">
+                                      <div className="space-y-2">
+                                        <h4 className="font-medium leading-none">Associated Licenses</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            Licenses linked to supplier "{row.fornitore}".
+                                        </p>
+                                      </div>
+                                      <div className="mt-4 rounded-md border overflow-hidden">
+                                          <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Prodotto</TableHead>
+                                                    <TableHead>Tipo Licenza</TableHead>
+                                                    <TableHead>Scadenza</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {row[headerKey].map((license: any) => (
+                                                    <TableRow key={license.id}>
+                                                        <TableCell>{license.Prodotto}</TableCell>
+                                                        <TableCell>{license.Tipo_Licenza}</TableCell>
+                                                        <TableCell>{license.Scadenza ? new Date(license.Scadenza).toLocaleDateString() : 'N/A'}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                          </Table>
+                                      </div>
+                                    </PopoverContent>
+                                </Popover>
+                             ) : (
+                                <div
+                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'licenses' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
+                                  title={getDisplayValue(row[headerKey])}
+                                >
+                                  {headerKey === 'licenses' && <FileText className="mr-2 h-4 w-4 text-muted-foreground" />}
+                                  {getDisplayValue(row[headerKey])}
+                                </div>
+                             )
                           )}
                         </TableCell>
                       ))}
