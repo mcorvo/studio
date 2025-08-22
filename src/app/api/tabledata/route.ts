@@ -15,10 +15,10 @@ export async function GET() {
         },
       },
     });
-    // Format DateTime to ISO string without time for consistency
+    // Format the data to include full supplier info
     const formattedLicenses = licenses.map(license => ({
         ...license,
-        suppliers: license.suppliers.length, // Just return a count for now
+        suppliers: license.suppliers.map(s => s.supplier), // Send full supplier objects
         Scadenza: license.Scadenza ? license.Scadenza.toISOString().split('T')[0] : null,
     }));
     return NextResponse.json(formattedLicenses);

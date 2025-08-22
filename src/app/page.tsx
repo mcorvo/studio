@@ -11,21 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight, Building } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import Link from 'next/link';
 
 
@@ -63,6 +54,9 @@ const getDisplayValue = (value: any): string => {
   }
   if (typeof value === 'boolean') {
     return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return `${value.length}`;
   }
   if (typeof value === 'object' && value !== null) {
     try {
@@ -235,7 +229,7 @@ const LicenseManagementPage: NextPage = () => {
           if (typeof item !== 'object' || item === null) return { value: item };
           const newItem: any = {};
           LICENSE_MODEL_HEADERS.forEach(header => {
-            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' || header === 'suppliers' ? 0 : (header === 'Borrowable' ? false : ''));
+            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' ? [] : (header === 'Borrowable' ? false : '')));
           });
           if (item.id) newItem.id = item.id;
           return newItem;
@@ -332,7 +326,7 @@ const LicenseManagementPage: NextPage = () => {
         try {
           if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
              parsedNewValue = "";
-          } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle' || headerKey === 'suppliers') {
+          } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
             const num = parseInt(currentEditValue, 10);
             parsedNewValue = isNaN(num) ? (originalValue || 0) : num;
           } else if (headerKey === 'Borrowable') {
@@ -391,8 +385,10 @@ const LicenseManagementPage: NextPage = () => {
         switch(header) {
             case 'Numero_Licenze':
             case 'Bundle':
-            case 'suppliers':
                 newRow[header] = 0;
+                break;
+            case 'suppliers':
+                newRow[header] = [];
                 break;
             case 'Borrowable':
                 newRow[header] = false;
@@ -729,12 +725,52 @@ const LicenseManagementPage: NextPage = () => {
                                 />
                             )
                           ) : (
-                            <div
-                              className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'suppliers' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying ? 'cursor-not-allowed' : ''}`}
-                              title={getDisplayValue(row[headerKey])}
-                            >
-                              {getDisplayValue(row[headerKey])}
-                            </div>
+                             headerKey === 'suppliers' && Array.isArray(row[headerKey]) && row[headerKey].length > 0 ? (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <div className="p-3 w-full h-full box-border min-h-[2.5rem] flex items-center cursor-pointer hover:bg-muted/30">
+                                           <Building className="mr-2 h-4 w-4 text-muted-foreground" />
+                                           {getDisplayValue(row[headerKey])}
+                                        </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto max-w-lg">
+                                      <div className="space-y-2">
+                                        <h4 className="font-medium leading-none">Associated Suppliers</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            Suppliers linked to license for "{row.Prodotto}".
+                                        </p>
+                                      </div>
+                                      <div className="mt-4 rounded-md border overflow-hidden">
+                                          <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Fornitore</TableHead>
+                                                    <TableHead>Email</TableHead>
+                                                    <TableHead>Prodotto</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {row[headerKey].map((supplier: any) => (
+                                                    <TableRow key={supplier.id}>
+                                                        <TableCell>{supplier.fornitore}</TableCell>
+                                                        <TableCell>{supplier.email}</TableCell>
+                                                        <TableCell>{supplier.Prodotto}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                          </Table>
+                                      </div>
+                                    </PopoverContent>
+                                </Popover>
+                            ) : (
+                                <div
+                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying || headerKey === 'suppliers' ? 'cursor-not-allowed' : ''}`}
+                                  title={getDisplayValue(row[headerKey])}
+                                >
+                                  {headerKey === 'suppliers' && <Building className="mr-2 h-4 w-4 text-muted-foreground" />}
+                                  {getDisplayValue(row[headerKey])}
+                                </div>
+                            )
                           )}
                         </TableCell>
                       ))}
