@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 type SortDirection = 'ascending' | 'descending';
@@ -102,6 +103,8 @@ const LicenseManagementPage: NextPage = () => {
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const { toast } = useToast();
+  const [isConfirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
+  const [pendingEditCell, setPendingEditCell] = useState<EditingCell | null>(null);
 
 
   const loadDataFromDB = useCallback(async () => {
@@ -372,8 +375,29 @@ const LicenseManagementPage: NextPage = () => {
     if (editingCell) {
       handleSaveEdit();
     }
-    setEditingCell({ rowIndex, headerKey });
-    setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
+    
+    const rowData = tableData?.[rowIndex];
+    if (rowData && typeof rowData.id === 'number' && rowData.id > 0) {
+      setPendingEditCell({ rowIndex, headerKey });
+      setConfirmationDialogOpen(true);
+    } else {
+      setEditingCell({ rowIndex, headerKey });
+      setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
+    }
+  };
+  
+  const proceedWithEdit = () => {
+    if (pendingEditCell) {
+      setEditingCell(pendingEditCell);
+      setCurrentEditValue(getDisplayValue(tableData?.[pendingEditCell.rowIndex]?.[pendingEditCell.headerKey]));
+    }
+    setConfirmationDialogOpen(false);
+    setPendingEditCell(null);
+  };
+  
+  const cancelEdit = () => {
+    setConfirmationDialogOpen(false);
+    setPendingEditCell(null);
   };
 
   const handleAddRow = useCallback(() => {
@@ -559,6 +583,21 @@ const LicenseManagementPage: NextPage = () => {
           </Button>
         </CardFooter>
       </Card> */}
+      
+      <AlertDialog open={isConfirmationDialogOpen} onOpenChange={setConfirmationDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Edit</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This record is already saved in the database. Are you sure you want to edit it?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={cancelEdit}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={proceedWithEdit}>Edit</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {(isLoading && status === 'authenticated') && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
@@ -788,3 +827,5 @@ const LicenseManagementPage: NextPage = () => {
 };
 
 export default LicenseManagementPage;
+
+    

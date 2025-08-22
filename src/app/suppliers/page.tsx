@@ -14,6 +14,8 @@ import { Download, ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save,
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -82,6 +84,8 @@ const SupplierManagementPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [currentEditValue, setCurrentEditValue] = useState<string>('');
+  const [isConfirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
+  const [pendingEditCell, setPendingEditCell] = useState<EditingCell | null>(null);
 
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
@@ -224,8 +228,29 @@ const SupplierManagementPage: NextPage = () => {
     if (editingCell) {
       handleSaveEdit();
     }
-    setEditingCell({ rowIndex, headerKey });
-    setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
+    
+    const rowData = tableData?.[rowIndex];
+    if (rowData && typeof rowData.id === 'number' && rowData.id > 0) {
+      setPendingEditCell({ rowIndex, headerKey });
+      setConfirmationDialogOpen(true);
+    } else {
+      setEditingCell({ rowIndex, headerKey });
+      setCurrentEditValue(getDisplayValue(tableData?.[rowIndex]?.[headerKey]));
+    }
+  };
+  
+  const proceedWithEdit = () => {
+    if (pendingEditCell) {
+      setEditingCell(pendingEditCell);
+      setCurrentEditValue(getDisplayValue(tableData?.[pendingEditCell.rowIndex]?.[pendingEditCell.headerKey]));
+    }
+    setConfirmationDialogOpen(false);
+    setPendingEditCell(null);
+  };
+  
+  const cancelEdit = () => {
+    setConfirmationDialogOpen(false);
+    setPendingEditCell(null);
   };
 
   const handleAddRow = useCallback(() => {
@@ -300,6 +325,21 @@ const SupplierManagementPage: NextPage = () => {
         </div>
       </header>
 
+      <AlertDialog open={isConfirmationDialogOpen} onOpenChange={setConfirmationDialogOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Edit</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This record is already saved in the database. Are you sure you want to edit it?
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={cancelEdit}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={proceedWithEdit}>Edit</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+      
       {isLoading && (
         <Alert variant="default" className="mb-8 shadow-md rounded-md border-blue-500/50">
             <div className="flex items-center">
@@ -485,3 +525,5 @@ const SupplierManagementPage: NextPage = () => {
 };
 
 export default SupplierManagementPage;
+
+    
