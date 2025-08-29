@@ -54,9 +54,8 @@ export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOu
         gte: today,
         lte: fourMonthsFromNow,
       },
-      Email_Rivenditore: {
+      Rivenditore: {
         not: null,
-        contains: '@',
       }
     },
   });

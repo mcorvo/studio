@@ -55,9 +55,7 @@ export async function POST(request: Request) {
         Tipo_Licenza: String(item.Tipo_Licenza ?? ''),
         Numero_Licenze: isNaN(numLicenze) ? 0 : numLicenze,
         Bundle: isNaN(bundleVal) ? 0 : bundleVal,
-        Borrowable: item.Borrowable === true || String(item.Borrowable).toLowerCase() === 'true',
         Rivenditore: String(item.Rivenditore ?? ''),
-        Email_Rivenditore: String(item.Email_Rivenditore ?? ''),
         Scadenza: scadenzaDate,
       };
     });

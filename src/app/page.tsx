@@ -32,7 +32,7 @@ interface EditingCell {
   headerKey: string;
 }
 
-const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Borrowable', 'Contratto', 'Rivenditore', 'Email_Rivenditore', 'Scadenza', 'suppliers'];
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Contratto', 'Rivenditore', 'Scadenza', 'suppliers'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -232,7 +232,7 @@ const LicenseManagementPage: NextPage = () => {
           if (typeof item !== 'object' || item === null) return { value: item };
           const newItem: any = {};
           LICENSE_MODEL_HEADERS.forEach(header => {
-            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' ? [] : (header === 'Borrowable' ? false : '')));
+            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' ? [] : ''));
           });
           if (item.id) newItem.id = item.id;
           return newItem;
@@ -327,13 +327,11 @@ const LicenseManagementPage: NextPage = () => {
 
     if (headerKey !== 'Scadenza') {
         try {
-          if (currentEditValue.trim() === "" && typeof originalValue !== 'boolean' && typeof originalValue !== 'number') {
+          if (currentEditValue.trim() === "" && typeof originalValue !== 'number') {
              parsedNewValue = "";
           } else if (headerKey === 'Numero_Licenze' || headerKey === 'Bundle') {
             const num = parseInt(currentEditValue, 10);
             parsedNewValue = isNaN(num) ? (originalValue || 0) : num;
-          } else if (headerKey === 'Borrowable') {
-            parsedNewValue = currentEditValue.toLowerCase() === 'true';
           } else if (typeof originalValue === 'string' || originalValue === null || originalValue === undefined) {
             parsedNewValue = currentEditValue;
           }
@@ -413,9 +411,6 @@ const LicenseManagementPage: NextPage = () => {
                 break;
             case 'suppliers':
                 newRow[header] = [];
-                break;
-            case 'Borrowable':
-                newRow[header] = false;
                 break;
             case 'Scadenza':
                 newRow[header] = null;
@@ -556,7 +551,7 @@ const LicenseManagementPage: NextPage = () => {
               id="json-textarea"
               value={jsonInput}
               onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
-              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Borrowable": true, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Email_Rivenditore": "contact@resellerx.com", "Scadenza": "2025-12-31"}]'
+              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Scadenza": "2025-12-31"}]'
               rows={10}
               className="border-input focus:ring-primary focus:border-primary rounded-md"
               aria-label="Paste JSON data"
