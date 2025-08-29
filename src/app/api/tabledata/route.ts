@@ -13,6 +13,7 @@ export async function GET() {
             supplier: true,
           },
         },
+        rdas: true,
       },
     });
     // Format the data to include full supplier info
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(async (tx) => {
       await tx.licensesOnSuppliers.deleteMany({});
+      await tx.rda.deleteMany({});
       await tx.license.deleteMany({});
 
       if (licensesToCreate.length > 0) {

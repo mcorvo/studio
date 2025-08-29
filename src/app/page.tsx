@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight, Building } from 'lucide-react';
+import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight, Building, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -32,7 +32,7 @@ interface EditingCell {
   headerKey: string;
 }
 
-const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Contratto', 'Rivenditore', 'Scadenza', 'suppliers'];
+const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Contratto', 'Rivenditore', 'Scadenza', 'suppliers', 'rdas'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -232,7 +232,7 @@ const LicenseManagementPage: NextPage = () => {
           if (typeof item !== 'object' || item === null) return { value: item };
           const newItem: any = {};
           LICENSE_MODEL_HEADERS.forEach(header => {
-            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' ? [] : ''));
+            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' || header === 'rdas' ? [] : ''));
           });
           if (item.id) newItem.id = item.id;
           return newItem;
@@ -266,7 +266,7 @@ const LicenseManagementPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
-    if (key === 'id' || key === 'suppliers') return;
+    if (key === 'id' || key === 'suppliers' || key === 'rdas') return;
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -365,7 +365,7 @@ const LicenseManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id' || headerKey === 'suppliers') return;
+    if (isLoading || headerKey === 'id' || headerKey === 'suppliers' || headerKey === 'rdas') return;
 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
@@ -410,6 +410,7 @@ const LicenseManagementPage: NextPage = () => {
                 newRow[header] = 0;
                 break;
             case 'suppliers':
+            case 'rdas':
                 newRow[header] = [];
                 break;
             case 'Scadenza':
@@ -694,16 +695,16 @@ const LicenseManagementPage: NextPage = () => {
                       <TableHead
                         key={headerKey}
                         onClick={() => requestSort(headerKey)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' || headerKey === 'suppliers' ? 'cursor-default' : ''}`}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' || headerKey === 'suppliers' || headerKey === 'rdas' ? 'cursor-default' : ''}`}
                         aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
-                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : (headerKey === 'suppliers' ? 'Associated suppliers (not sortable/editable)' : `Sort by ${headerKey}`)}
+                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : (headerKey === 'suppliers' ? 'Associated suppliers (not sortable/editable)' : (headerKey === 'rdas' ? 'Associated RDAs (not sortable/editable)' : `Sort by ${headerKey}`))}
                       >
                         <div className="flex items-center gap-1">
                           {headerKey}
-                          {headerKey !== 'id' && headerKey !== 'suppliers' && sortConfig?.key === headerKey ? (
+                          {headerKey !== 'id' && headerKey !== 'suppliers' && headerKey !== 'rdas' && sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
-                           headerKey !== 'id' && headerKey !== 'suppliers' && <ArrowUpDown className="h-4 w-4 opacity-30" />
+                           headerKey !== 'id' && headerKey !== 'suppliers' && headerKey !== 'rdas' && <ArrowUpDown className="h-4 w-4 opacity-30" />
                           )}
                         </div>
                       </TableHead>
@@ -718,7 +719,7 @@ const LicenseManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || headerKey === 'suppliers' || isNotifying) return;
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('[data-radix-popper-content-wrapper]') || headerKey === 'id' || headerKey === 'suppliers' || headerKey === 'rdas' || isNotifying) return;
                              handleCellClick(rowIndex, headerKey);
                           }}
                         >
@@ -796,12 +797,50 @@ const LicenseManagementPage: NextPage = () => {
                                       </div>
                                     </PopoverContent>
                                 </Popover>
+                            ) : headerKey === 'rdas' && Array.isArray(row[headerKey]) && row[headerKey].length > 0 ? (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                    <div className="p-3 w-full h-full box-border min-h-[2.5rem] flex items-center cursor-pointer hover:bg-muted/30">
+                                       <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                                       {getDisplayValue(row[headerKey])}
+                                    </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto max-w-lg">
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Associated RDAs</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        RDAs linked to license for "{row.Prodotto}".
+                                    </p>
+                                  </div>
+                                  <div className="mt-4 rounded-md border overflow-hidden">
+                                      <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>RDA</TableHead>
+                                                <TableHead>Anno</TableHead>
+                                                <TableHead>Rivenditore</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {row[headerKey].map((rda: any) => (
+                                                <TableRow key={rda.rda}>
+                                                    <TableCell>{rda.rda}</TableCell>
+                                                    <TableCell>{rda.anno}</TableCell>
+                                                    <TableCell>{rda.rivenditore}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                      </Table>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             ) : (
                                 <div
-                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying || headerKey === 'suppliers' ? 'cursor-not-allowed' : ''}`}
+                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'} ${isNotifying || headerKey === 'suppliers' || headerKey === 'rdas' ? 'cursor-not-allowed' : ''}`}
                                   title={getDisplayValue(row[headerKey])}
                                 >
                                   {headerKey === 'suppliers' && <Building className="mr-2 h-4 w-4 text-muted-foreground" />}
+                                  {headerKey === 'rdas' && <FileText className="mr-2 h-4 w-4 text-muted-foreground" />}
                                   {getDisplayValue(row[headerKey])}
                                 </div>
                             )
