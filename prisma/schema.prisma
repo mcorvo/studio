@@ -16,9 +16,7 @@ model License {
   Tipo_Licenza      String
   Numero_Licenze    Int
   Bundle            Int
-  Borrowable        Boolean
   Rivenditore       String?
-  Email_Rivenditore String?
   Scadenza          DateTime?
   suppliers         LicensesOnSuppliers[]
 }
