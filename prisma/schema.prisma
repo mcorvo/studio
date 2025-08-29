@@ -1,35 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model License {
-  id                Int     @default(autoincrement()) @id
-  Contratto         String?
-  Produttore        String
-  Prodotto          String
-  Tipo_Licenza      String
-  Numero_Licenze    Int
-  Bundle            Int
-  Rivenditore       String?
-  Scadenza          DateTime?
-  suppliers         LicensesOnSuppliers[]
+  id             Int      @id @default(autoincrement())
+  Contratto      String?
+  Produttore     String?
+  Prodotto       String   @unique
+  Tipo_Licenza   String?
+  Numero_Licenze Int?
+  Bundle         Int?
+  Rivenditore    String?
+  Scadenza       DateTime? @db.Date
+
+  suppliers LicensesOnSuppliers[]
+  rdas      Rda[]
 }
 
 model Supplier {
-  id              Int      @default(autoincrement()) @id
-  fornitore       String
-  anno            Int
+  id              Int      @id @default(autoinvert())
+  fornitore       String   @unique
+  anno            Int?
   email           String?
   link_rda        String?
-  fornitore_unico Boolean
+  fornitore_unico Boolean?
   Prodotto        String?
-  licenses        LicensesOnSuppliers[]
+
+  licenses LicensesOnSuppliers[]
+}
+
+model Rda {
+  rda         String @id
+  anno        Int?
+  rivenditore String?
+
+  license   License @relation(fields: [licenseId], references: [id])
+  licenseId Int
 }
 
 model LicensesOnSuppliers {
@@ -37,8 +51,6 @@ model LicensesOnSuppliers {
   licenseId  Int
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId Int
-  assignedAt DateTime @default(now())
-  assignedBy String?
 
   @@id([licenseId, supplierId])
 }
