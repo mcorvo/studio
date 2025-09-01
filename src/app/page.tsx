@@ -3,21 +3,18 @@
 
 import { useState, useMemo, ChangeEvent, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
 import type { NextPage } from 'next';
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, FileJsonIcon, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, Mail, BellRing, LogIn, LogOut, ArrowRight, Building, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Download, ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, CalendarIcon, BellRing, LogIn, Building, FileText, LibrarySquare } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import Link from 'next/link';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
@@ -90,8 +87,6 @@ const UnauthenticatedScreen = () => (
 
 const LicenseManagementPage: NextPage = () => {
   const { data: session, status } = useSession();
-  const [jsonInput, setJsonInput] = useState<string>('');
-  const [fileName, setFileName] = useState<string | null>(null);
   const [tableData, setTableData] = useState<any[] | null>(null);
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -181,75 +176,6 @@ const LicenseManagementPage: NextPage = () => {
     }
   }, [tableData, loadDataFromDB]);
 
-
-  const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setIsLoading(true);
-      setError(null);
-      setSuccessMessage(null);
-      setFileName(file.name);
-      setEditingCell(null);
-      try {
-        const text = await file.text();
-        setJsonInput(text);
-        setSuccessMessage(`File "${file.name}" loaded. Click "View Table" to process.`);
-      } catch (err) {
-        setError(`Error reading file: ${err instanceof Error ? err.message : String(err)}`);
-        setJsonInput('');
-        setFileName(null);
-      } finally {
-        setIsLoading(false);
-        event.target.value = '';
-      }
-    }
-  }, []);
-
-  const processJson = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-    setSortConfig(null);
-    setEditingCell(null);
-
-    if (!jsonInput.trim()) {
-      setError("JSON input is empty. Clearing table.");
-      setTableData([]);
-      setTableHeaders(LICENSE_MODEL_HEADERS);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      let parsedData = JSON.parse(jsonInput);
-      let dataArray: any[] = Array.isArray(parsedData) ? parsedData : [parsedData];
-      if (dataArray.length === 0) {
-        setTableData([]);
-        setTableHeaders(getAllKeys(dataArray).length > 0 ? getAllKeys(dataArray) : LICENSE_MODEL_HEADERS);
-        setSuccessMessage("JSON processed. The array is empty.");
-      } else {
-        dataArray = dataArray.map(item => {
-          if (typeof item !== 'object' || item === null) return { value: item };
-          const newItem: any = {};
-          LICENSE_MODEL_HEADERS.forEach(header => {
-            newItem[header] = item[header] ?? (header === 'Numero_Licenze' || header === 'Bundle' ? 0 : (header === 'suppliers' || header === 'rdas' ? [] : ''));
-          });
-          if (item.id) newItem.id = item.id;
-          return newItem;
-        });
-        setTableHeaders(getAllKeys(dataArray));
-        setTableData(dataArray);
-        setSuccessMessage("JSON data successfully processed and table updated.");
-      }
-    } catch (err) {
-      setError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
-      setTableData(null);
-      setTableHeaders([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [jsonInput]);
-
   const sortedTableData = useMemo(() => {
     if (!tableData) return null;
     let sortableItems = [...tableData];
@@ -300,7 +226,7 @@ const LicenseManagementPage: NextPage = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      const exportFileName = fileName ? `${fileName.split('.')[0]}.csv` : 'licenses_export.csv';
+      const exportFileName = 'licenses_export.csv';
       link.setAttribute('download', exportFileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
@@ -311,7 +237,7 @@ const LicenseManagementPage: NextPage = () => {
     } catch (err) {
       setError(`Failed to export CSV: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [sortedTableData, tableHeaders, fileName]);
+  }, [sortedTableData, tableHeaders]);
 
   const handleSaveEdit = useCallback(() => {
     if (!editingCell || !tableData) return;
@@ -503,88 +429,14 @@ const LicenseManagementPage: NextPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
-      <header className="mb-8 flex justify-between items-center flex-wrap gap-4">
-        <div className="text-center flex-grow">
-            <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
+    <div className="container mx-auto p-0">
+      <div className="text-left mb-8">
+            <h1 className="text-4xl font-headline font-bold text-primary flex items-center gap-3">
+                <LibrarySquare className="w-10 h-10" />
+                License Data Management
+            </h1>
             <p className="text-muted-foreground mt-2">Manage license, supplier, and RDA data.</p>
-        </div>
-        <div className="flex items-center gap-4 flex-wrap justify-center w-full sm:w-auto">
-            <Link href="/suppliers" passHref>
-                <Button variant="outline">
-                    Manage Suppliers
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-            </Link>
-            <Link href="/rda" passHref>
-                <Button variant="outline">
-                    Manage RDAs
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-            </Link>
-            <Button onClick={() => signOut()} variant="outline">
-                <LogOut className="mr-2 h-5 w-5" />
-                Sign Out
-            </Button>
-        </div>
-      </header>
-
-      {/*<Card className="mb-8 shadow-lg rounded-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl font-headline">
-            <FileJsonIcon className="text-primary w-7 h-7" />
-            Input License Data (JSON)
-          </CardTitle>
-          <CardDescription>Upload a .json file or paste content. New data will replace existing table content. Save to persist to DB.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="json-file-input" className="font-semibold text-lg">Upload JSON File</Label>
-            <Input
-              id="json-file-input"
-              type="file"
-              accept=".json,application/json"
-              onChange={handleFileChange}
-              className="flex-grow file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
-              aria-label="Upload JSON file"
-              disabled={isLoading || isNotifying}
-            />
-            {fileName && !error && jsonInput && <p className="text-sm text-muted-foreground mt-1">Loaded file: {fileName}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="json-textarea" className="font-semibold text-lg">Or Paste JSON Here</Label>
-            <Textarea
-              id="json-textarea"
-              value={jsonInput}
-              onChange={(e) => { setJsonInput(e.target.value); setFileName(null); setError(null); setSuccessMessage(null); setEditingCell(null);}}
-              placeholder='e.g., [{"Produttore": "Example Inc", "Prodotto": "Software X", "Tipo_Licenza": "Subscription", "Numero_Licenze": 10, "Bundle": 1, "Contratto": "CTR-001", "Rivenditore": "ResellerX", "Scadenza": "2025-12-31"}]'
-              rows={10}
-              className="border-input focus:ring-primary focus:border-primary rounded-md"
-              aria-label="Paste JSON data"
-              disabled={isLoading || isNotifying}
-            />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button
-            onClick={processJson}
-            disabled={isLoading || isNotifying || !jsonInput.trim()}
-            className="bg-accent hover:bg-accent/90 text-accent-foreground w-full md:w-auto rounded-md text-base py-3 px-6"
-            aria-label="View JSON data as table"
-          >
-            {isLoading && jsonInput.trim() && !successMessage?.includes("database") ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing JSON...
-              </span>
-            ) : "View Table from Input"}
-          </Button>
-        </CardFooter>
-      </Card> */}
+      </div>
       
       <AlertDialog open={isConfirmationDialogOpen} onOpenChange={setConfirmationDialogOpen}>
         <AlertDialogContent>
@@ -694,7 +546,7 @@ const LicenseManagementPage: NextPage = () => {
             ) : sortedTableData && sortedTableData.length > 0 ? (
             <div className="overflow-x-auto rounded-md border">
               <Table>
-                <TableCaption className="py-4">{fileName ? `Data from ${fileName}` : (jsonInput ? 'Data from pasted JSON' : (tableData.length > 0 ? 'Data from database' : 'No data source'))}. {sortedTableData.length > 0 ? `Found ${sortedTableData.length} rows.` : ''}</TableCaption>
+                <TableCaption className="py-4">{tableData.length > 0 ? 'Data from database' : 'No data source'}. {sortedTableData.length > 0 ? `Found ${sortedTableData.length} rows.` : ''}</TableCaption>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     {tableHeaders.map((headerKey) => (

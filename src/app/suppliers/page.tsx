@@ -1,21 +1,17 @@
 
 "use client";
 
-import { useState, useMemo, ChangeEvent, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
+import { useState, useMemo, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
 import type { NextPage } from 'next';
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Download, ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, LogOut, ArrowLeft, Building, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, Building, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import Link from 'next/link';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -305,25 +301,14 @@ const SupplierManagementPage: NextPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
-      <header className="mb-8 flex justify-between items-center">
-        <div className="text-center flex-grow">
-            <h1 className="text-4xl font-headline font-bold text-primary">Supplier Management</h1>
+    <div className="container mx-auto p-0">
+      <div className="text-left mb-8">
+            <h1 className="text-4xl font-headline font-bold text-primary flex items-center gap-3">
+                <Building className="w-10 h-10" />
+                Supplier Management
+            </h1>
             <p className="text-muted-foreground mt-2">View, edit, add, and save supplier data.</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <Link href="/" passHref>
-                <Button variant="outline">
-                    <ArrowLeft className="mr-2 h-5 w-5" />
-                    Back to Licenses
-                </Button>
-            </Link>
-            <Button onClick={() => signOut()} variant="outline">
-                <LogOut className="mr-2 h-5 w-5" />
-                Sign Out
-            </Button>
-        </div>
-      </header>
+      </div>
 
       <AlertDialog open={isConfirmationDialogOpen} onOpenChange={setConfirmationDialogOpen}>
           <AlertDialogContent>
@@ -525,5 +510,3 @@ const SupplierManagementPage: NextPage = () => {
 };
 
 export default SupplierManagementPage;
-
-    

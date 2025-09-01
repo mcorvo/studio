@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import SessionProvider from '@/components/session-provider';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import DashboardLayout from './dashboard-layout';
 
 export const metadata: Metadata = {
   title: 'License Data Management',
@@ -26,7 +27,7 @@ export default async function RootLayout({
       </head>
       <body className="font-body antialiased">
         <SessionProvider session={session}>
-          {children}
+            {session ? <DashboardLayout>{children}</DashboardLayout> : children}
         </SessionProvider>
         <Toaster />
       </body>
