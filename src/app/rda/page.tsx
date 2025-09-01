@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, LogOut, ArrowLeft, FileText } from 'lucide-react';
+import { ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, LogOut, ArrowLeft, FileText, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -429,7 +429,7 @@ const RdaManagementPage: NextPage = () => {
                           key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                             if ((e.target as HTMLElement).tagName === 'INPUT' || headerKey === 'id') return;
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('a') || headerKey === 'id') return;
                              handleCellClick(rowIndex, headerKey);
                           }}
                         >
@@ -448,7 +448,14 @@ const RdaManagementPage: NextPage = () => {
                                className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                                title={getDisplayValue(row[headerKey])}
                              >
-                               {getDisplayValue(row[headerKey])}
+                               { headerKey === 'rda' && getDisplayValue(row[headerKey]).startsWith('https') ? (
+                                    <a href={getDisplayValue(row[headerKey])} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-500 hover:underline">
+                                        <Link2 className="h-4 w-4" />
+                                        {getDisplayValue(row[headerKey])}
+                                    </a>
+                                ) : (
+                                    getDisplayValue(row[headerKey])
+                                )}
                              </div>
                           )}
                         </TableCell>
@@ -467,3 +474,5 @@ const RdaManagementPage: NextPage = () => {
 };
 
 export default RdaManagementPage;
+
+    
