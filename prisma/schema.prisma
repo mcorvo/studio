@@ -32,7 +32,22 @@ model Supplier {
   link_rda        String
   fornitore_unico Boolean
   Prodotto        String?
+<<<<<<< Updated upstream
   licenses        LicensesOnSuppliers[]
+=======
+
+  licenses LicensesOnSuppliers[]
+}
+
+model Rda {
+  id          Int      @id @default(autoincrement())
+  rda         String @unique
+  anno        Int?
+  rivenditore String?
+
+  license   License @relation(fields: [licenseId], references: [id])
+  licenseId Int
+>>>>>>> Stashed changes
 }
 
 // Explicit many-to-many join table
