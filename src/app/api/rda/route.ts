@@ -30,7 +30,8 @@ export async function POST(request: Request) {
 
     const rdasToCreate: Prisma.RdaCreateManyInput[] = body.map(item => {
       const anno = parseInt(String(item.anno), 10);
-      const licenseId = item.prodotto ? licenseMap.get(item.prodotto) : null;
+      /*const licenseId = item.prodotto ? licenseMap.get(item.prodotto) : null;*/
+      const licenseId = licenseMap.get(item.prodotto);
       
       return {
         rda: String(item.rda ?? ''),
