@@ -11,41 +11,31 @@ datasource db {
 }
 
 model License {
-  id             Int      @id @default(autoincrement())
-  Contratto      String?
-  Produttore     String?
-  Prodotto       String   @unique
-  Tipo_Licenza   String?
-  Numero_Licenze Int?
-  Bundle         Int?
-  Rivenditore    String?
-  Scadenza       DateTime? @db.Date
-
-  suppliers LicensesOnSuppliers[]
-  rdas      Rda[]
+  id              Int      @id @default(autoincrement())
+  Contratto       String?
+  Produttore      String?
+  Prodotto        String   @unique
+  Tipo_Licenza    String?
+  Numero_Licenze  Int?
+  Bundle          Int?
+  Rivenditore     String?  @db.VarChar(255)
+  Scadenza        DateTime?
+  suppliers       LicensesOnSuppliers[]
+  rdas            Rda[]
 }
 
 model Supplier {
-  id              Int      @id @default(autoinvert())
+  id              Int      @id @default(autoincrement())
   fornitore       String   @unique
-  anno            Int?
-  email           String?
-  link_rda        String?
-  fornitore_unico Boolean?
+  anno            Int
+  email           String
+  link_rda        String
+  fornitore_unico Boolean
   Prodotto        String?
-
-  licenses LicensesOnSuppliers[]
+  licenses        LicensesOnSuppliers[]
 }
 
-model Rda {
-  rda         String @id
-  anno        Int?
-  rivenditore String?
-
-  license   License @relation(fields: [licenseId], references: [id])
-  licenseId Int
-}
-
+// Explicit many-to-many join table
 model LicensesOnSuppliers {
   license    License  @relation(fields: [licenseId], references: [id])
   licenseId  Int
@@ -53,4 +43,14 @@ model LicensesOnSuppliers {
   supplierId Int
 
   @@id([licenseId, supplierId])
+}
+
+model Rda {
+  id          Int      @id @default(autoincrement())
+  rda         String   @unique
+  prodotto    String?
+  anno        Int
+  rivenditore String?
+  license     License? @relation(fields: [licenseId], references: [Prodotto])
+  licenseId   String?
 }

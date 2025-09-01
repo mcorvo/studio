@@ -829,7 +829,7 @@ const LicenseManagementPage: NextPage = () => {
                                         </TableHeader>
                                         <TableBody>
                                             {row[headerKey].map((rda: any) => (
-                                                <TableRow key={rda.rda}>
+                                                <TableRow key={rda.id}>
                                                     <TableCell>{rda.rda}</TableCell>
                                                     <TableCell>{rda.anno}</TableCell>
                                                     <TableCell>{rda.rivenditore}</TableCell>

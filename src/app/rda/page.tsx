@@ -35,6 +35,10 @@ const getAllKeys = (data: any[]): string[] => {
   });
   // Filter out licenseId if it exists
   const keys = Array.from(allKeys).filter(key => key !== 'licenseId');
+  if (keys.includes('id')) {
+    keys.splice(keys.indexOf('id'), 1);
+    keys.unshift('id');
+  }
   return keys;
 };
 
@@ -159,7 +163,7 @@ const RdaManagementPage: NextPage = () => {
   }, [tableData, sortConfig]);
 
   const requestSort = (key: string) => {
-    if (key === 'rda') return;
+    if (key === 'id') return;
     let direction: SortDirection = 'ascending';
     if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
@@ -201,7 +205,7 @@ const RdaManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading) return;
+    if (isLoading || headerKey === 'id') return;
 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
@@ -211,16 +215,12 @@ const RdaManagementPage: NextPage = () => {
     }
     
     const rowData = tableData?.[rowIndex];
-    const isSaved = rowData && typeof rowData.rda === 'string' && rowData.rda.length > 0;
+    const isSaved = rowData && typeof rowData.id === 'number' && rowData.id > 0;
 
     if (isSaved) {
-       // Check if the record was present on initial load to decide whether to show confirmation
-       const initialData = tableData?.find(d => d.rda === rowData.rda);
-       if(initialData) {
-         setPendingEditCell({ rowIndex, headerKey });
-         setConfirmationDialogOpen(true);
-         return;
-       }
+        setPendingEditCell({ rowIndex, headerKey });
+        setConfirmationDialogOpen(true);
+        return;
     }
     
     setEditingCell({ rowIndex, headerKey });
@@ -256,14 +256,20 @@ const RdaManagementPage: NextPage = () => {
         }
     });
     
-    if (tableHeaders.length === 0) {
-        setTableHeaders(RDA_MODEL_HEADERS);
+    let currentHeaders = [...tableHeaders];
+    if (currentHeaders.length === 0 || !RDA_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
+        const headersWithId = (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id'));
+        currentHeaders = [...RDA_MODEL_HEADERS];
+        if (headersWithId) {
+            currentHeaders.unshift('id');
+        }
+        setTableHeaders(currentHeaders);
     }
 
     setTableData(prevData => [...(prevData || []), newRow]);
     setSuccessMessage("New RDA row added. Click cells to edit. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders]);
+  }, [isLoading, tableHeaders, tableData]);
 
   if (status === "loading") {
       return (
@@ -353,7 +359,7 @@ const RdaManagementPage: NextPage = () => {
                 <FileText className="h-6 w-6"/>
                 RDA Data Table
               </CardTitle>
-              <CardDescription>'rda' is the primary key and cannot be edited once saved. Save changes to the database.</CardDescription>
+              <CardDescription>'id' is database-generated and not editable. 'rda' must be unique. Save changes to the database.</CardDescription>
             </div>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-wrap justify-end">
                <Button
@@ -399,16 +405,16 @@ const RdaManagementPage: NextPage = () => {
                       <TableHead
                         key={headerKey}
                         onClick={() => requestSort(headerKey)}
-                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'rda' ? 'cursor-default' : ''}`}
+                        className={`cursor-pointer hover:bg-muted transition-colors select-none whitespace-nowrap p-3 text-sm font-medium ${sortConfig?.key === headerKey ? 'bg-muted text-primary' : ''} ${headerKey === 'id' ? 'cursor-default' : ''}`}
                         aria-sort={sortConfig?.key === headerKey ? sortConfig.direction : 'none'}
-                        title={headerKey === 'rda' ? 'Primary Key (not sortable/editable after save)' : `Sort by ${headerKey}`}
+                        title={headerKey === 'id' ? 'ID (not sortable/editable)' : `Sort by ${headerKey}`}
                       >
                         <div className="flex items-center gap-1">
                           {headerKey.replace(/_/g, ' ')}
-                          {headerKey !== 'rda' && sortConfig?.key === headerKey ? (
+                          {headerKey !== 'id' && sortConfig?.key === headerKey ? (
                             sortConfig.direction === 'ascending' ? <ArrowUpDown className="h-4 w-4 opacity-80 transform rotate-180 transition-transform" /> : <ArrowUpDown className="h-4 w-4 opacity-80 transition-transform" />
                           ) : (
-                           headerKey !== 'rda' && <ArrowUpDown className="h-4 w-4 opacity-30" />
+                           headerKey !== 'id' && <ArrowUpDown className="h-4 w-4 opacity-30" />
                           )}
                         </div>
                       </TableHead>
@@ -417,14 +423,13 @@ const RdaManagementPage: NextPage = () => {
                 </TableHeader>
                 <TableBody>
                   {sortedTableData.map((row, rowIndex) => (
-                    <TableRow key={row.rda || rowIndex} className="hover:bg-muted/20 transition-colors data-[state=selected]:bg-muted">
+                    <TableRow key={row.id || rowIndex} className="hover:bg-muted/20 transition-colors data-[state=selected]:bg-muted">
                       {tableHeaders.map((headerKey) => (
                         <TableCell
-                          key={`${row.rda || rowIndex}-${headerKey}`}
+                          key={`${row.id || rowIndex}-${headerKey}`}
                           className="p-0 text-sm relative"
                           onClickCapture={(e) => {
-                             const isRdaSaved = tableData?.some(d => d.rda === row.rda);
-                             if ((e.target as HTMLElement).tagName === 'INPUT' || (headerKey === 'rda' && isRdaSaved)) return;
+                             if ((e.target as HTMLElement).tagName === 'INPUT' || headerKey === 'id') return;
                              handleCellClick(rowIndex, headerKey);
                           }}
                         >
@@ -440,7 +445,7 @@ const RdaManagementPage: NextPage = () => {
                               />
                           ) : (
                              <div
-                               className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey === 'rda' && row.rda ? 'text-muted-foreground' : 'cursor-pointer hover:bg-muted/30'}`}
+                               className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                                title={getDisplayValue(row[headerKey])}
                              >
                                {getDisplayValue(row[headerKey])}

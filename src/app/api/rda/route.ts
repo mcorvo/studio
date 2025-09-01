@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 export async function GET() {
   try {
     const rdas = await prisma.rda.findMany({
-      orderBy: { rda: 'asc' },
+      orderBy: { id: 'asc' },
     });
     return NextResponse.json(rdas);
   } catch (error) {
@@ -26,11 +26,10 @@ export async function POST(request: Request) {
     const allLicenses = await prisma.license.findMany({
       select: { id: true, Prodotto: true }
     });
-    const licenseMap = new Map(allLicenses.map(l => [l.Prodotto, l.id]));
+    const licenseMap = new Map(allLicenses.map(l => [l.Prodotto, l.Prodotto]));
 
     const rdasToCreate: Prisma.RdaCreateManyInput[] = body.map(item => {
       const anno = parseInt(String(item.anno), 10);
-      /*const licenseId = item.prodotto ? licenseMap.get(item.prodotto) : null;*/
       const licenseId = licenseMap.get(item.prodotto);
       
       return {
@@ -57,7 +56,7 @@ export async function POST(request: Request) {
     console.error('Failed to save RDA data:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const field = (error.meta?.target as string[])?.[0];
-        return NextResponse.json({ message: `Failed to save data. Duplicate value for primary key field: ${field}`}, { status: 409 });
+        return NextResponse.json({ message: `Failed to save data. Duplicate value for field: ${field}`}, { status: 409 });
     }
     if (error instanceof SyntaxError) {
         return NextResponse.json({ message: 'Invalid JSON payload provided' }, { status: 400 });
