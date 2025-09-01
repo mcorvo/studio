@@ -504,15 +504,21 @@ const LicenseManagementPage: NextPage = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-8 min-h-screen bg-background text-foreground font-body">
-      <header className="mb-8 flex justify-between items-center">
+      <header className="mb-8 flex justify-between items-center flex-wrap gap-4">
         <div className="text-center flex-grow">
             <h1 className="text-4xl font-headline font-bold text-primary">License Data Management</h1>
-            <p className="text-muted-foreground mt-2">Upload or paste JSON, view, edit, add license rows, and persist data to a database.</p>
+            <p className="text-muted-foreground mt-2">Manage license, supplier, and RDA data.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap justify-center w-full sm:w-auto">
             <Link href="/suppliers" passHref>
                 <Button variant="outline">
                     Manage Suppliers
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+            </Link>
+            <Link href="/rda" passHref>
+                <Button variant="outline">
+                    Manage RDAs
                     <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
             </Link>
@@ -861,5 +867,3 @@ const LicenseManagementPage: NextPage = () => {
 };
 
 export default LicenseManagementPage;
-
-    
