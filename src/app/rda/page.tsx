@@ -78,6 +78,8 @@ const RdaManagementPage: NextPage = () => {
   const [isConfirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
   const [pendingEditCell, setPendingEditCell] = useState<EditingCell | null>(null);
 
+  const isAdmin = useMemo(() => session?.user?.roles?.includes('administrator') ?? false, [session]);
+
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -117,6 +119,10 @@ const RdaManagementPage: NextPage = () => {
   }, [status, loadDataFromDB]);
 
   const saveDataToDB = useCallback(async () => {
+    if (!isAdmin) {
+      setError("You do not have permission to save data.");
+      return;
+    }
     if (!tableData) {
       setError("No data to save.");
       return;
@@ -144,7 +150,7 @@ const RdaManagementPage: NextPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [tableData, loadDataFromDB]);
+  }, [tableData, loadDataFromDB, isAdmin]);
 
   const sortedTableData = useMemo(() => {
     if (!tableData) return null;
@@ -204,7 +210,7 @@ const RdaManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id') return;
+    if (isLoading || !isAdmin || headerKey === 'id') return;
 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
@@ -241,7 +247,7 @@ const RdaManagementPage: NextPage = () => {
   };
 
   const handleAddRow = useCallback(() => {
-    if (isLoading) return;
+    if (isLoading || !isAdmin) return;
     setEditingCell(null);
     const newRow: { [key: string]: any } = {};
 
@@ -268,7 +274,7 @@ const RdaManagementPage: NextPage = () => {
     setTableData(prevData => [...(prevData || []), newRow]);
     setSuccessMessage("New RDA row added. Click cells to edit. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders, tableData]);
+  }, [isLoading, tableHeaders, tableData, isAdmin]);
 
   if (status === "loading") {
       return (
@@ -347,29 +353,33 @@ const RdaManagementPage: NextPage = () => {
                 <FileText className="h-6 w-6"/>
                 RDA Data Table
               </CardTitle>
-              <CardDescription>'id' is database-generated and not editable. 'rda' must be unique. Save changes to the database.</CardDescription>
+              <CardDescription>{isAdmin ? "'id' is database-generated and not editable. 'rda' must be unique. Save changes to the database." : "View-only access. You do not have permission to edit this data."}</CardDescription>
             </div>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-wrap justify-end">
-               <Button
-                onClick={saveDataToDB}
-                variant="default"
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
-                aria-label="Save table data to database"
-                disabled={isLoading || !tableData || tableData.length === 0}
-              >
-                <Save className="mr-2 h-5 w-5" />
-                Save to Database
-              </Button>
-              <Button
-                onClick={handleAddRow}
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-                aria-label="Add new row to table"
-                disabled={isLoading}
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Add Row
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    onClick={saveDataToDB}
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
+                    aria-label="Save table data to database"
+                    disabled={isLoading || !tableData || tableData.length === 0}
+                  >
+                    <Save className="mr-2 h-5 w-5" />
+                    Save to Database
+                  </Button>
+                  <Button
+                    onClick={handleAddRow}
+                    variant="outline"
+                    className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                    aria-label="Add new row to table"
+                    disabled={isLoading}
+                  >
+                    <PlusCircle className="mr-2 h-5 w-5" />
+                    Add Row
+                  </Button>
+                </>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -433,7 +443,7 @@ const RdaManagementPage: NextPage = () => {
                               />
                           ) : (
                              <div
-                               className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
+                               className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${isAdmin && headerKey !== 'id' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                                title={getDisplayValue(row[headerKey])}
                              >
                                { headerKey === 'rda' && getDisplayValue(row[headerKey]).startsWith('https') ? (

@@ -83,6 +83,8 @@ const SupplierManagementPage: NextPage = () => {
   const [isConfirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
   const [pendingEditCell, setPendingEditCell] = useState<EditingCell | null>(null);
 
+  const isAdmin = useMemo(() => session?.user?.roles?.includes('administrator') ?? false, [session]);
+
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -122,6 +124,10 @@ const SupplierManagementPage: NextPage = () => {
   }, [status, loadDataFromDB]);
 
   const saveDataToDB = useCallback(async () => {
+    if (!isAdmin) {
+      setError("You do not have permission to save data.");
+      return;
+    }
     if (!tableData) {
       setError("No data to save.");
       return;
@@ -154,7 +160,7 @@ const SupplierManagementPage: NextPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [tableData, loadDataFromDB]);
+  }, [tableData, loadDataFromDB, isAdmin]);
 
   const sortedTableData = useMemo(() => {
     if (!tableData) return null;
@@ -216,7 +222,7 @@ const SupplierManagementPage: NextPage = () => {
   };
 
   const handleCellClick = (rowIndex: number, headerKey: string) => {
-    if (isLoading || headerKey === 'id' || headerKey === 'licenses') return;
+    if (isLoading || !isAdmin || headerKey === 'id' || headerKey === 'licenses') return;
 
     if (editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey) {
       return;
@@ -250,7 +256,7 @@ const SupplierManagementPage: NextPage = () => {
   };
 
   const handleAddRow = useCallback(() => {
-    if (isLoading) return;
+    if (isLoading || !isAdmin) return;
     setEditingCell(null);
     const newRow: { [key: string]: any } = {};
 
@@ -283,7 +289,7 @@ const SupplierManagementPage: NextPage = () => {
     setTableData(prevData => [...(prevData || []), newRow]);
     setSuccessMessage("New supplier row added. Click cells to edit. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders, tableData]);
+  }, [isLoading, tableHeaders, tableData, isAdmin]);
 
   if (status === "loading") {
       return (
@@ -362,29 +368,33 @@ const SupplierManagementPage: NextPage = () => {
                 <Building className="h-6 w-6"/>
                 Supplier Data Table
               </CardTitle>
-              <CardDescription>'id' is database-generated and not editable. Save changes to the database.</CardDescription>
+              <CardDescription>{isAdmin ? "'id' is database-generated and not editable. Save changes to the database." : "View-only access. You do not have permission to edit this data."}</CardDescription>
             </div>
             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-wrap justify-end">
-               <Button
-                onClick={saveDataToDB}
-                variant="default"
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
-                aria-label="Save table data to database"
-                disabled={isLoading || !tableData || tableData.length === 0}
-              >
-                <Save className="mr-2 h-5 w-5" />
-                Save to Database
-              </Button>
-              <Button
-                onClick={handleAddRow}
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-                aria-label="Add new row to table"
-                disabled={isLoading}
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Add Row
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button
+                    onClick={saveDataToDB}
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700 text-white rounded-md w-full md:w-auto"
+                    aria-label="Save table data to database"
+                    disabled={isLoading || !tableData || tableData.length === 0}
+                  >
+                    <Save className="mr-2 h-5 w-5" />
+                    Save to Database
+                  </Button>
+                  <Button
+                    onClick={handleAddRow}
+                    variant="outline"
+                    className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                    aria-label="Add new row to table"
+                    disabled={isLoading}
+                  >
+                    <PlusCircle className="mr-2 h-5 w-5" />
+                    Add Row
+                  </Button>
+                </>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -486,7 +496,7 @@ const SupplierManagementPage: NextPage = () => {
                                 </Popover>
                              ) : (
                                 <div
-                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${headerKey !== 'id' && headerKey !== 'licenses' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
+                                  className={`p-3 truncate w-full h-full box-border min-h-[2.5rem] flex items-center ${isAdmin && headerKey !== 'id' && headerKey !== 'licenses' ? 'cursor-pointer hover:bg-muted/30' : 'text-muted-foreground'}`}
                                   title={getDisplayValue(row[headerKey])}
                                 >
                                   {headerKey === 'licenses' && <FileText className="mr-2 h-4 w-4 text-muted-foreground" />}
