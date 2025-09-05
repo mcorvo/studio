@@ -2,8 +2,8 @@
 import NextAuth, { AuthOptions, Profile } from "next-auth";
 import KeycloakProvider from "next-auth/providers/keycloak";
 
-// Define an interface for the Keycloak profile that includes roles
-interface KeycloakProfile extends Profile {
+// Define an interface for the JWT payload from the access token
+interface AccessTokenPayload {
     realm_access?: {
       roles: string[];
     };
@@ -27,17 +27,28 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, profile }) {
-        // On sign-in, `profile` is available.
-        // We are casting profile to our custom type to access roles.
-        const kcProfile = profile as KeycloakProfile | undefined;
-        if (kcProfile && kcProfile.realm_access) {
-            token.roles = kcProfile.realm_access.roles;
+    async jwt({ token, account }) {
+        // On the first sign-in, the `account` object is available.
+        // We decode the access_token to get the roles.
+        if (account?.access_token) {
+            try {
+                const accessTokenPayload: AccessTokenPayload = JSON.parse(
+                    Buffer.from(account.access_token.split('.')[1], 'base64').toString()
+                );
+                
+                if (accessTokenPayload.realm_access) {
+                    token.roles = accessTokenPayload.realm_access.roles;
+                }
+                
+                // Use the client ID from environment variables to access client-specific roles.
+                const clientId = process.env.OAUTH_CLIENT_ID;
+                if (clientId && accessTokenPayload.resource_access && accessTokenPayload.resource_access[clientId]) {
+                    token.clientRoles = accessTokenPayload.resource_access[clientId].roles;
+                }
+            } catch (error) {
+                console.error("Error decoding access token:", error);
+            }
         }
-        // Add client roles (for a specific client, e.g. "my-client")
-        if (kcProfile && kcProfile.resource_access && kcProfile.resource_access["license-studio"]) {
-            token.clientRoles = kcProfile.resource_access["license-studio"].roles;
-      }
         return token;
     },
     async session({ session, token }) {
@@ -46,7 +57,7 @@ export const authOptions: AuthOptions = {
             session.user.roles = token.roles as string[];
         }
         if (token.clientRoles) {
-          session.user.clientRoles = token.clientRoles as string[] | undefined;
+          session.user.clientRoles = token.clientRoles as string[];
         }
         return session;
     }

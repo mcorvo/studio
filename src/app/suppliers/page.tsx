@@ -83,7 +83,7 @@ const SupplierManagementPage: NextPage = () => {
   const [isConfirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
   const [pendingEditCell, setPendingEditCell] = useState<EditingCell | null>(null);
 
-  const isAdmin = useMemo(() => session?.user?.roles?.includes('administrator') ?? false, [session]);
+  const isAdmin = useMemo(() => session?.user?.clientRoles?.includes('administrator') ?? false, [session]);
 
   const loadDataFromDB = useCallback(async () => {
     setIsLoading(true);
