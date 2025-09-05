@@ -7,6 +7,13 @@ interface KeycloakProfile extends Profile {
     realm_access?: {
       roles: string[];
     };
+    resource_access?: {
+      [clientId: string]: {
+        roles: string[];
+      }
+    };
+    // Any extra claims
+    [claim: string]: unknown;
 }
 
 export const authOptions: AuthOptions = {
@@ -27,12 +34,19 @@ export const authOptions: AuthOptions = {
         if (kcProfile && kcProfile.realm_access) {
             token.roles = kcProfile.realm_access.roles;
         }
+        // Add client roles (for a specific client, e.g. "my-client")
+        if (kcProfile && kcProfile.resource_access && kcProfile.resource_access["license-studio"]) {
+            token.clientRoles = kcProfile.resource_access["license-studio"].roles;
+      }
         return token;
     },
     async session({ session, token }) {
         // Add roles to the session object, so it's available on the client.
         if (token.roles) {
             session.user.roles = token.roles as string[];
+        }
+        if (token.clientRoles) {
+          session.user.clientRoles = token.clientRoles as string[] | undefined;
         }
         return session;
     }
