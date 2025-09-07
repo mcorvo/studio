@@ -488,7 +488,6 @@ const SupplierManagementPage: NextPage = () => {
                                 >
                                   {headerKey === 'licenses' && <FileText className="mr-2 h-4 w-4 text-muted-foreground" />}
                                   {getDisplayValue(row[headerKey])}
-                                d_rivenditore, fornitore_unico, Prodotto FROM suppliers
                                 </div>
                              )
                           )}
