@@ -14,7 +14,7 @@ import {
   SidebarTrigger,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Building, FileText, LibrarySquare, LogOut } from 'lucide-react';
+import { Building, FileText, LibrarySquare, LogOut, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'next-auth/react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -25,6 +25,7 @@ const menuItems = [
   { href: '/', label: 'Licenses', icon: LibrarySquare },
   { href: '/suppliers', label: 'Suppliers', icon: Building },
   { href: '/rda', label: 'RDAs', icon: FileText },
+  { href: '/requests', label: 'Requests', icon: ClipboardList },
 ];
 
 const SidebarTitle = ({ children }: { children: React.ReactNode }) => (

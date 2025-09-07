@@ -1,14 +1,11 @@
 
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 model License {
@@ -20,25 +17,21 @@ model License {
   Numero_Licenze  Int?
   Bundle          Int?
   Rivenditore     String?
-  Scadenza        DateTime?
-  
+  Scadenza        DateTime? @db.Date
+
   suppliers       LicensesOnSuppliers[]
   rdas            Rda[]
-
-  @@map("licenses")
 }
 
 model Supplier {
-  id          Int      @id @default(autoincrement())
-  fornitore   String   @unique
-  email       String   @unique
-
-  licenses    LicensesOnSuppliers[]
-
-  @@map("suppliers")
+  id         Int      @id @default(autoincrement())
+  fornitore  String   @unique
+  email      String?
+  
+  licenses   LicensesOnSuppliers[]
 }
 
-// Join table for the many-to-many relationship between License and Supplier
+// Join table for many-to-many relationship between License and Supplier
 model LicensesOnSuppliers {
   license     License  @relation(fields: [licenseId], references: [id])
   licenseId   Int
@@ -48,16 +41,23 @@ model LicensesOnSuppliers {
   @@id([licenseId, supplierId])
 }
 
-
 model Rda {
   id          Int      @id @default(autoincrement())
   rda         String   @unique
   prodotto    String
-  anno        Int
+  anno        Int?
   rivenditore String?
 
   license     License? @relation(fields: [licenseId], references: [Prodotto])
   licenseId   String?
-
-  @@map("rdas")
 }
+
+model Requests {
+  id          Int      @id @default(autoincrement())
+  Richiedente String
+  Prodotto    String
+  Quantita    Int
+  Budget      Float
+  Anno        Int
+}
+
