@@ -23,36 +23,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of Request objects.' }, { status: 400 });
     }
     
-    // Separate records into new and existing ones
-    const newRecords = body.filter(item => !item.id);
-    const existingRecords = body.filter(item => item.id);
+    const recordsToCreate: Prisma.RequestsCreateManyInput[] = body.map(item => ({
+        Richiedente: String(item.Richiedente ?? ''),
+        Prodotto: String(item.Prodotto ?? ''),
+        Quantita: parseInt(String(item.Quantita), 10) || 0,
+        Budget: parseFloat(String(item.Budget)) || 0,
+        Anno: parseInt(String(item.Anno), 10) || new Date().getFullYear(),
+    }));
 
     await prisma.$transaction(async (tx) => {
-      // Create new records
-      if (newRecords.length > 0) {
-        const recordsToCreate = newRecords.map(item => ({
-            Richiedente: String(item.Richiedente ?? ''),
-            Prodotto: String(item.Prodotto ?? ''),
-            Quantita: parseInt(String(item.Quantita), 10) || 0,
-            Budget: parseFloat(String(item.Budget)) || 0,
-            Anno: parseInt(String(item.Anno), 10) || new Date().getFullYear(),
-        }));
+      // Delete all existing records
+      await tx.requests.deleteMany({});
+
+      // Create new records from the payload
+      if (recordsToCreate.length > 0) {
         await tx.requests.createMany({
           data: recordsToCreate,
-        });
-      }
-
-      // Update existing records
-      for (const item of existingRecords) {
-        await tx.requests.update({
-          where: { id: item.id },
-          data: {
-            Richiedente: String(item.Richiedente ?? ''),
-            Prodotto: String(item.Prodotto ?? ''),
-            Quantita: parseInt(String(item.Quantita), 10) || 0,
-            Budget: parseFloat(String(item.Budget)) || 0,
-            Anno: parseInt(String(item.Anno), 10) || new Date().getFullYear(),
-          },
         });
       }
     });
