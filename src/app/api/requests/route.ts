@@ -31,19 +31,13 @@ export async function POST(request: Request) {
         Anno: parseInt(String(item.Anno), 10) || new Date().getFullYear(),
     }));
 
-    await prisma.$transaction(async (tx) => {
-      // Delete all existing records
-      await tx.requests.deleteMany({});
+    if (recordsToCreate.length > 0) {
+      await prisma.requests.createMany({
+        data: recordsToCreate,
+      });
+    }
 
-      // Create new records from the payload
-      if (recordsToCreate.length > 0) {
-        await tx.requests.createMany({
-          data: recordsToCreate,
-        });
-      }
-    });
-
-    return NextResponse.json({ message: 'Request data saved successfully to database' }, { status: 200 });
+    return NextResponse.json({ message: 'Request data appended successfully to database' }, { status: 200 });
   } catch (error) {
     console.error('Failed to save Request data:', error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
