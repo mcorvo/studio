@@ -24,7 +24,7 @@ interface EditingCell {
   headerKey: string;
 }
 
-const SUPPLIER_MODEL_HEADERS = ['fornitore', 'anno', 'email', 'link_rda', 'fornitore_unico', 'Prodotto', 'licenses'];
+const SUPPLIER_MODEL_HEADERS = ['fornitore', 'email', 'licenses'];
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -99,7 +99,7 @@ const SupplierManagementPage: NextPage = () => {
       const data = await response.json();
       if (Array.isArray(data)) {
         setTableData(data);
-        setTableHeaders(getAllKeys(data));
+        setTableHeaders(getAllKeys(data).length > 0 ? getAllKeys(data) : SUPPLIER_MODEL_HEADERS);
         if (data.length > 0) {
           setSuccessMessage("Supplier data successfully loaded from database.");
         } else {
@@ -198,14 +198,7 @@ const SupplierManagementPage: NextPage = () => {
       return;
     }
     
-    let parsedNewValue: any = currentEditValue;
-    
-    if (headerKey === 'anno') {
-      const num = parseInt(currentEditValue, 10);
-      parsedNewValue = isNaN(num) ? (new Date().getFullYear()) : num;
-    } else if (headerKey === 'fornitore_unico') {
-      parsedNewValue = currentEditValue.toLowerCase() === 'true';
-    }
+    const parsedNewValue: any = currentEditValue;
     
     newData[rowIndex] = { ...currentItem, [headerKey]: parsedNewValue };
     setTableData(newData);
@@ -262,14 +255,8 @@ const SupplierManagementPage: NextPage = () => {
 
     SUPPLIER_MODEL_HEADERS.forEach(header => {
         switch(header) {
-            case 'anno':
-                newRow[header] = new Date().getFullYear();
-                break;
             case 'licenses':
                 newRow[header] = [];
-                break;
-            case 'fornitore_unico':
-                newRow[header] = false;
                 break;
             default:
                 newRow[header] = "";
@@ -448,7 +435,7 @@ const SupplierManagementPage: NextPage = () => {
                         >
                           {editingCell && editingCell.rowIndex === rowIndex && editingCell.headerKey === headerKey ? (
                               <Input
-                                type={headerKey === 'anno' ? 'number' : 'text'}
+                                type={'text'}
                                 value={currentEditValue}
                                 onChange={(e) => setCurrentEditValue(e.target.value)}
                                 onBlurCapture={handleSaveEdit}
@@ -501,6 +488,7 @@ const SupplierManagementPage: NextPage = () => {
                                 >
                                   {headerKey === 'licenses' && <FileText className="mr-2 h-4 w-4 text-muted-foreground" />}
                                   {getDisplayValue(row[headerKey])}
+                                d_rivenditore, fornitore_unico, Prodotto FROM suppliers
                                 </div>
                              )
                           )}

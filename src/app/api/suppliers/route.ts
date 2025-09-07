@@ -35,19 +35,15 @@ export async function POST(request: Request) {
     }
 
     const suppliersToCreate = body.map(item => {
-      const anno = parseInt(String(item.anno), 10);
-      
       return {
         fornitore: String(item.fornitore ?? ''),
-        anno: isNaN(anno) ? new Date().getFullYear() : anno,
         email: String(item.email ?? ''),
-        link_rda: String(item.link_rda ?? ''),
-        fornitore_unico: item.fornitore_unico === true || String(item.fornitore_unico).toLowerCase() === 'true',
-        Prodotto: String(item.Prodotto ?? ''),
       };
     });
 
     await prisma.$transaction(async (tx) => {
+      // We are deleting all suppliers and recreating them
+      // so we also need to delete the join table entries first.
       await tx.licensesOnSuppliers.deleteMany({});
       await tx.supplier.deleteMany({});
 
@@ -56,18 +52,21 @@ export async function POST(request: Request) {
           data: suppliersToCreate,
         });
 
+        // The relationship is now primarily managed from the license side.
+        // After creating suppliers, we can re-link any existing licenses
+        // that might reference them.
         const createdSuppliers = await tx.supplier.findMany();
         const allLicenses = await tx.license.findMany();
         
-        const licenseMap = new Map(allLicenses.map(l => [l.Prodotto, l.id]));
+        const supplierMap = new Map(createdSuppliers.map(s => [s.fornitore, s.id]));
 
-        for (const supplier of createdSuppliers) {
-            if (supplier.Prodotto && licenseMap.has(supplier.Prodotto)) {
-                const licenseId = licenseMap.get(supplier.Prodotto)!;
+        for (const license of allLicenses) {
+            if (license.Rivenditore && supplierMap.has(license.Rivenditore)) {
+                const supplierId = supplierMap.get(license.Rivenditore)!;
                 await tx.licensesOnSuppliers.create({
                     data: {
-                        licenseId: licenseId,
-                        supplierId: supplier.id,
+                        licenseId: license.id,
+                        supplierId: supplierId,
                     }
                 });
             }
