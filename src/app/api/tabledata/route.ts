@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
 
 export async function GET() {
   try {
@@ -37,49 +36,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of license objects.' }, { status: 400 });
     }
 
-    const licensesToCreate = body.map(item => {
-      const numLicenze = parseInt(String(item.Numero_Licenze), 10);
-      const bundleVal = parseInt(String(item.Bundle), 10);
-      
-      let scadenzaDate: Date | null = null;
-      if (item.Scadenza && typeof item.Scadenza === 'string') {
-          const date = new Date(item.Scadenza);
-          if (!isNaN(date.getTime())) {
-              scadenzaDate = date;
-          }
-      }
-
-      return {
-        Contratto: String(item.Contratto ?? ''),
-        Produttore: String(item.Produttore ?? ''),
-        Prodotto: String(item.Prodotto ?? ''),
-        Tipo_Licenza: String(item.Tipo_Licenza ?? ''),
-        Numero_Licenze: isNaN(numLicenze) ? 0 : numLicenze,
-        Bundle: isNaN(bundleVal) ? 0 : bundleVal,
-        Rivenditore: String(item.Rivenditore ?? ''),
-        Scadenza: scadenzaDate,
-      };
-    });
-
-
     await prisma.$transaction(async (tx) => {
-      await tx.licensesOnSuppliers.deleteMany({});
-      await tx.rda.deleteMany({});
-      await tx.license.deleteMany({});
-
-      if (licensesToCreate.length > 0) {
-        await tx.license.createMany({
-          data: licensesToCreate,
-        });
-
-        // After creation, link them up
-        const createdLicenses = await tx.license.findMany();
         const allSuppliers = await tx.supplier.findMany();
-        
-        // Create a map for quick supplier lookup by their name
         const supplierMap = new Map(allSuppliers.map(s => [s.fornitore, s.id]));
 
-        for (const license of createdLicenses) {
+        for (const item of body) {
+            const numLicenze = parseInt(String(item.Numero_Licenze), 10);
+            const bundleVal = parseInt(String(item.Bundle), 10);
+            
+            let scadenzaDate: Date | null = null;
+            if (item.Scadenza && typeof item.Scadenza === 'string') {
+                const date = new Date(item.Scadenza);
+                if (!isNaN(date.getTime())) {
+                    scadenzaDate = date;
+                }
+            }
+
+            const licenseData = {
+              Contratto: String(item.Contratto ?? ''),
+              Produttore: String(item.Produttore ?? ''),
+              Prodotto: String(item.Prodotto ?? ''),
+              Tipo_Licenza: String(item.Tipo_Licenza ?? ''),
+              Numero_Licenze: isNaN(numLicenze) ? 0 : numLicenze,
+              Bundle: isNaN(bundleVal) ? 0 : bundleVal,
+              Rivenditore: String(item.Rivenditore ?? ''),
+              Scadenza: scadenzaDate,
+            };
+
+            const license = await tx.license.upsert({
+                where: { id: item.id || -1 }, // Use -1 for records that don't have an ID
+                update: licenseData,
+                create: licenseData,
+            });
+
+            // Re-link supplier
+            await tx.licensesOnSuppliers.deleteMany({
+                where: { licenseId: license.id }
+            });
             if (license.Rivenditore && supplierMap.has(license.Rivenditore)) {
                 const supplierId = supplierMap.get(license.Rivenditore)!;
                 await tx.licensesOnSuppliers.create({
@@ -90,7 +83,6 @@ export async function POST(request: Request) {
                 });
             }
         }
-      }
     });
 
     return NextResponse.json({ message: 'License data saved successfully to database' }, { status: 200 });
