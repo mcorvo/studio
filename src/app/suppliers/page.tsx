@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
+import { useState, useMemo, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'next';
 import type { NextPage } from 'next';
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -137,17 +137,12 @@ const SupplierManagementPage: NextPage = () => {
     setSuccessMessage(null);
     setEditingCell(null);
     try {
-      const dataToSend = tableData.map(row => {
-        const { id, ...rest } = row;
-        return (typeof id === 'number' && id > 0) ? row : rest;
-      });
-
       const response = await fetch('/api/suppliers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(tableData),
       });
       if (!response.ok) {
         const errorData = await response.json();

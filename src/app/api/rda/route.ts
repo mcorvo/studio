@@ -22,32 +22,30 @@ export async function POST(request: Request) {
     if (!Array.isArray(body)) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of RDA objects.' }, { status: 400 });
     }
-
-    const allLicenses = await prisma.license.findMany({
-      select: { id: true, Prodotto: true }
-    });
-    const licenseMap = new Map(allLicenses.map(l => [l.Prodotto, l.Prodotto]));
-
-    const rdasToCreate: Prisma.RdaCreateManyInput[] = body.map(item => {
-      const anno = parseInt(String(item.anno), 10);
-      const licenseId = licenseMap.get(item.prodotto)!;
-      
-      return {
-        rda: String(item.rda ?? ''),
-        prodotto: String(item.prodotto ?? ''),
-        anno: isNaN(anno) ? new Date().getFullYear() : anno,
-        rivenditore: String(item.rivenditore ?? ''),
-        licenseId: licenseId,
-      };
-    });
-
+    
     await prisma.$transaction(async (tx) => {
-      await tx.rda.deleteMany({});
+      const allLicenses = await tx.license.findMany({
+        select: { Prodotto: true }
+      });
+      const licenseProductSet = new Set(allLicenses.map(l => l.Prodotto));
 
-      if (rdasToCreate.length > 0) {
-        await tx.rda.createMany({
-          data: rdasToCreate,
-        });
+      for (const item of body) {
+          const anno = parseInt(String(item.anno), 10);
+          const licenseExists = licenseProductSet.has(item.prodotto);
+
+          const rdaData = {
+              rda: String(item.rda ?? ''),
+              prodotto: String(item.prodotto ?? ''),
+              anno: isNaN(anno) ? new Date().getFullYear() : anno,
+              rivenditore: String(item.rivenditore ?? ''),
+              licenseId: licenseExists ? item.prodotto : null,
+          };
+
+          await tx.rda.upsert({
+              where: { id: item.id || -1 },
+              update: rdaData,
+              create: rdaData,
+          });
       }
     });
 

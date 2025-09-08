@@ -34,44 +34,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid data format. Expected an array of supplier objects.' }, { status: 400 });
     }
 
-    const suppliersToCreate = body.map(item => {
-      return {
-        fornitore: String(item.fornitore ?? ''),
-        email: String(item.email ?? ''),
-      };
-    });
-
     await prisma.$transaction(async (tx) => {
-      // We are deleting all suppliers and recreating them
-      // so we also need to delete the join table entries first.
-      await tx.licensesOnSuppliers.deleteMany({});
-      await tx.supplier.deleteMany({});
+        for (const item of body) {
+            const supplierData = {
+              fornitore: String(item.fornitore ?? ''),
+              email: String(item.email ?? ''),
+            };
 
-      if (suppliersToCreate.length > 0) {
-        await tx.supplier.createMany({
-          data: suppliersToCreate,
-        });
+            const supplier = await tx.supplier.upsert({
+                where: { id: item.id || -1 },
+                update: supplierData,
+                create: supplierData,
+            });
 
-        // The relationship is now primarily managed from the license side.
-        // After creating suppliers, we can re-link any existing licenses
-        // that might reference them.
-        const createdSuppliers = await tx.supplier.findMany();
-        const allLicenses = await tx.license.findMany();
-        
-        const supplierMap = new Map(createdSuppliers.map(s => [s.fornitore, s.id]));
+            // After upserting the supplier, ensure relationships are correct.
+            // This is simplified because the relationship is primarily managed
+            // from the license via the `Rivenditore` string field. We just
+            // need to make sure any licenses that point to this supplier by
+            // its name `fornitore` are linked.
+            const licensesToLink = await tx.license.findMany({
+                where: { Rivenditore: supplier.fornitore }
+            });
 
-        for (const license of allLicenses) {
-            if (license.Rivenditore && supplierMap.has(license.Rivenditore)) {
-                const supplierId = supplierMap.get(license.Rivenditore)!;
-                await tx.licensesOnSuppliers.create({
-                    data: {
+            // First, remove existing links for this supplier to avoid duplicates
+            await tx.licensesOnSuppliers.deleteMany({
+                where: { supplierId: supplier.id }
+            });
+
+            // Then, create the links for all licenses associated with this supplier
+            if (licensesToLink.length > 0) {
+                await tx.licensesOnSuppliers.createMany({
+                    data: licensesToLink.map(license => ({
                         licenseId: license.id,
-                        supplierId: supplierId,
-                    }
+                        supplierId: supplier.id,
+                    }))
                 });
             }
         }
-      }
     });
 
     return NextResponse.json({ message: 'Supplier data saved successfully to database' }, { status: 200 });
