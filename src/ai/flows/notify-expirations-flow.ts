@@ -46,7 +46,7 @@ export async function notifyExpiringLicenses(): Promise<NotifyExpiringLicensesOu
   const recipient: string = process.env.EMAIL_RECIPIENT!;
   const today = new Date();
   const fourMonthsFromNow = new Date();
-  fourMonthsFromNow.setMonth(today.getMonth() + 4);
+  fourMonthsFromNow.setMonth(today.getMonth() + parseInt(process.env.MONTHS_BEFORE!));
 
   const expiringLicenses = await prisma.license.findMany({
     where: {

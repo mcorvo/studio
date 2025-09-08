@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'next';
+import { useState, useMemo, useCallback, KeyboardEvent as ReactKeyboardEvent, useEffect } from 'react';
 import type { NextPage } from 'next';
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";

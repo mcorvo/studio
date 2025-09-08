@@ -1,6 +1,6 @@
 services:
   licensemgr:
-    image: json-endpoint:latest
+    image: refine-lic-table:latest
     ports:
       - '127.0.0.1:3000:3000'
     environment:
