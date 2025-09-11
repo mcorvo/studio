@@ -1,11 +1,44 @@
 services:
   licensemgr:
-    image: refine-lic-table:latest
+    image: data-popup:latest
     ports:
       - '127.0.0.1:3000:3000'
     environment:
       - NODE_ENV=production
       - NEXTAUTH_URL=https://lm-mathcad.infn.it
+    configs:
+      - source: next_config
+        target: /app/.env
+  auth:
+    image: quay.io/keycloak/keycloak:26.3.3
+    configs:
+      - source: keycloak_config
+        target: /opt/keycloak/conf/keycloak.conf
+    environment:
+      KC_HOSTNAME: lm-mathcad.infn.it
+      KEYCLOAK_PRODUCTION: true
+      KC_HTTP_PORT: 7080
+        #KC_HTTPS_PORT: 8443
+      KEYCLOAK_ENABLE_HTTPS: false
+      KEYCLOAK_HTTPS_USE_PEM: false
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: K3ycl04K
+      KC_LOG_LEVEL: info
+      KC_HTTP_RELATIVE_PATH: "/auth"
+      KC_HOSTNAME_STRICT_HTTPS: false
+    volumes:
+      - /etc/pki/tls/private/lm-mathcad.infn.it.key:/opt/keycloak/conf/lm-mathcad.infn.it.key:rw 
+      - /etc/pki/tls/certs/lm-mathcad.pem:/opt/keycloak/conf/lm-mathcad.pem:rw
+    ports:
+      #- 8443:8443
+      - 7080:7080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7080/health/ready"]
+      interval: 15s
+      timeout: 2s
+      retries: 15
+    command: ["start"]
   db:
     image: postgres
     restart: always
@@ -31,3 +64,8 @@ services:
 
 volumes:
   pgdata:
+configs:
+  keycloak_config:
+    file: /home/corvo/PrivateProjects/studio/keycloak.conf
+  next_config:
+    file: /home/corvo/PrivateProjects/studio/.env
