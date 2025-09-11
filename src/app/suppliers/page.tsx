@@ -12,6 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, Building, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -25,6 +30,14 @@ interface EditingCell {
 }
 
 const SUPPLIER_MODEL_HEADERS = ['fornitore', 'email', 'licenses'];
+
+const supplierFormSchema = z.object({
+    fornitore: z.string().min(1, "Supplier name is required"),
+    email: z.string().email("Invalid email address").optional().or(z.literal('')),
+});
+
+type SupplierFormValues = z.infer<typeof supplierFormSchema>;
+
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -69,6 +82,71 @@ const UnauthenticatedScreen = () => (
         </Card>
     </div>
 );
+
+const AddSupplierDialog = ({ onSave, children }: { onSave: (data: SupplierFormValues) => void; children: React.ReactNode }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const form = useForm<SupplierFormValues>({
+        resolver: zodResolver(supplierFormSchema),
+        defaultValues: {
+            fornitore: '',
+            email: '',
+        },
+    });
+
+    const onSubmit = (data: SupplierFormValues) => {
+        onSave(data);
+        form.reset();
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Add New Supplier</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details for the new supplier. Click save when you're done.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="fornitore"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Supplier Name</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Supplier Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="contact@supplier.com" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+                            <Button type="submit">Save</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 const SupplierManagementPage: NextPage = () => {
   const { data: session, status } = useSession();
@@ -243,35 +321,19 @@ const SupplierManagementPage: NextPage = () => {
     setPendingEditCell(null);
   };
 
-  const handleAddRow = useCallback(() => {
+  const handleAddRow = useCallback((newSupplier: SupplierFormValues) => {
     if (isLoading || !isAdmin) return;
     setEditingCell(null);
-    const newRow: { [key: string]: any } = {};
-
-    SUPPLIER_MODEL_HEADERS.forEach(header => {
-        switch(header) {
-            case 'licenses':
-                newRow[header] = [];
-                break;
-            default:
-                newRow[header] = "";
-        }
-    });
     
-    let currentHeaders = [...tableHeaders];
-    if (currentHeaders.length === 0 || !SUPPLIER_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
-        const headersWithId = (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id'));
-        currentHeaders = [...SUPPLIER_MODEL_HEADERS];
-        if (headersWithId) {
-            currentHeaders.unshift('id');
-        }
-        setTableHeaders(currentHeaders);
-    }
-
+    const newRow = {
+        ...newSupplier,
+        licenses: [],
+    };
+    
     setTableData(prevData => [...(prevData || []), newRow]);
-    setSuccessMessage("New supplier row added. Click cells to edit. Save to persist changes to DB.");
+    setSuccessMessage("New supplier row added. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders, tableData, isAdmin]);
+  }, [isLoading, isAdmin]);
 
   if (status === "loading") {
       return (
@@ -365,16 +427,17 @@ const SupplierManagementPage: NextPage = () => {
                     <Save className="mr-2 h-5 w-5" />
                     Save to Database
                   </Button>
-                  <Button
-                    onClick={handleAddRow}
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-                    aria-label="Add new row to table"
-                    disabled={isLoading}
-                  >
-                    <PlusCircle className="mr-2 h-5 w-5" />
-                    Add Row
-                  </Button>
+                  <AddSupplierDialog onSave={handleAddRow}>
+                      <Button
+                          variant="outline"
+                          className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                          aria-label="Add new row to table"
+                          disabled={isLoading}
+                      >
+                          <PlusCircle className="mr-2 h-5 w-5" />
+                          Add Row
+                      </Button>
+                  </AddSupplierDialog>
                 </>
               )}
             </div>
@@ -502,3 +565,5 @@ const SupplierManagementPage: NextPage = () => {
 };
 
 export default SupplierManagementPage;
+
+    

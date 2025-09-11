@@ -11,6 +11,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpDown, AlertCircle, CheckCircle2Icon, PlusCircle, Save, LogIn, FileText, Link2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 type SortDirection = 'ascending' | 'descending';
 interface SortConfig {
@@ -24,6 +29,16 @@ interface EditingCell {
 }
 
 const RDA_MODEL_HEADERS = ['rda', 'prodotto', 'anno', 'rivenditore'];
+
+const rdaFormSchema = z.object({
+    rda: z.string().min(1, "RDA is required"),
+    prodotto: z.string().min(1, "Product is required"),
+    anno: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 5),
+    rivenditore: z.string().optional(),
+});
+
+type RdaFormValues = z.infer<typeof rdaFormSchema>;
+
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -64,6 +79,99 @@ const UnauthenticatedScreen = () => (
         </Card>
     </div>
 );
+
+const AddRdaDialog = ({ onSave, children }: { onSave: (data: RdaFormValues) => void; children: React.ReactNode }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const form = useForm<RdaFormValues>({
+        resolver: zodResolver(rdaFormSchema),
+        defaultValues: {
+            rda: '',
+            prodotto: '',
+            anno: new Date().getFullYear(),
+            rivenditore: '',
+        },
+    });
+
+    const onSubmit = (data: RdaFormValues) => {
+        onSave(data);
+        form.reset();
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Add New RDA</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details for the new RDA. Click save when you're done.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="rda"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>RDA</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="RDA identifier or link" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="prodotto"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Product</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Product Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="anno"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Year</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="rivenditore"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Reseller</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Reseller Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                             <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+                            <Button type="submit">Save</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 const RdaManagementPage: NextPage = () => {
   const { data: session, status } = useSession();
@@ -246,35 +354,14 @@ const RdaManagementPage: NextPage = () => {
     setPendingEditCell(null);
   };
 
-  const handleAddRow = useCallback(() => {
+  const handleAddRow = useCallback((newRda: RdaFormValues) => {
     if (isLoading || !isAdmin) return;
     setEditingCell(null);
-    const newRow: { [key: string]: any } = {};
-
-    RDA_MODEL_HEADERS.forEach(header => {
-        switch(header) {
-            case 'anno':
-                newRow[header] = new Date().getFullYear();
-                break;
-            default:
-                newRow[header] = "";
-        }
-    });
     
-    let currentHeaders = [...tableHeaders];
-    if (currentHeaders.length === 0 || !RDA_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
-        const headersWithId = (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id'));
-        currentHeaders = [...RDA_MODEL_HEADERS];
-        if (headersWithId) {
-            currentHeaders.unshift('id');
-        }
-        setTableHeaders(currentHeaders);
-    }
-
-    setTableData(prevData => [...(prevData || []), newRow]);
-    setSuccessMessage("New RDA row added. Click cells to edit. Save to persist changes to DB.");
+    setTableData(prevData => [...(prevData || []), newRda]);
+    setSuccessMessage("New RDA row added. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders, tableData, isAdmin]);
+  }, [isLoading, isAdmin]);
 
   if (status === "loading") {
       return (
@@ -368,16 +455,17 @@ const RdaManagementPage: NextPage = () => {
                     <Save className="mr-2 h-5 w-5" />
                     Save to Database
                   </Button>
-                  <Button
-                    onClick={handleAddRow}
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-                    aria-label="Add new row to table"
-                    disabled={isLoading}
-                  >
-                    <PlusCircle className="mr-2 h-5 w-5" />
-                    Add Row
-                  </Button>
+                  <AddRdaDialog onSave={handleAddRow}>
+                      <Button
+                          variant="outline"
+                          className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                          aria-label="Add new row to table"
+                          disabled={isLoading}
+                      >
+                          <PlusCircle className="mr-2 h-5 w-5" />
+                          Add Row
+                      </Button>
+                  </AddRdaDialog>
                 </>
               )}
             </div>
@@ -472,3 +560,5 @@ const RdaManagementPage: NextPage = () => {
 };
 
 export default RdaManagementPage;
+
+    

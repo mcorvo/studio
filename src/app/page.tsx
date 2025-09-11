@@ -16,6 +16,11 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 
 type SortDirection = 'ascending' | 'descending';
@@ -30,6 +35,20 @@ interface EditingCell {
 }
 
 const LICENSE_MODEL_HEADERS = ['Produttore', 'Prodotto', 'Tipo_Licenza', 'Numero_Licenze', 'Bundle', 'Contratto', 'Rivenditore', 'Scadenza', 'suppliers', 'rdas'];
+
+const licenseFormSchema = z.object({
+    Produttore: z.string().min(1, "Producer is required"),
+    Prodotto: z.string().min(1, "Product is required"),
+    Tipo_Licenza: z.string().min(1, "License type is required"),
+    Numero_Licenze: z.coerce.number().int().min(0),
+    Bundle: z.coerce.number().int().min(0),
+    Contratto: z.string().optional(),
+    Rivenditore: z.string().optional(),
+    Scadenza: z.date().optional().nullable(),
+});
+
+type LicenseFormValues = z.infer<typeof licenseFormSchema>;
+
 
 const getAllKeys = (data: any[]): string[] => {
   const allKeys = new Set<string>();
@@ -84,6 +103,173 @@ const UnauthenticatedScreen = () => (
         </Card>
     </div>
 );
+
+const AddLicenseDialog = ({ onSave, children }: { onSave: (data: LicenseFormValues) => void; children: React.ReactNode }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const form = useForm<LicenseFormValues>({
+        resolver: zodResolver(licenseFormSchema),
+        defaultValues: {
+            Produttore: '',
+            Prodotto: '',
+            Tipo_Licenza: '',
+            Numero_Licenze: 0,
+            Bundle: 0,
+            Contratto: '',
+            Rivenditore: '',
+            Scadenza: null,
+        },
+    });
+
+    const onSubmit = (data: LicenseFormValues) => {
+        onSave(data);
+        form.reset();
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Add New License</DialogTitle>
+                    <DialogDescription>
+                        Fill in the details for the new license. Click save when you're done.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="Produttore"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Producer</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Producer Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="Prodotto"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Product</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Product Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="Tipo_Licenza"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>License Type</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., Subscription" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="Numero_Licenze"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Number of Licenses</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField control={form.control} name="Bundle" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Bundle</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField control={form.control} name="Contratto" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Contract</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Contract ID" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField control={form.control} name="Rivenditore" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Reseller</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Reseller Name" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="Scadenza"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Expiration Date</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn(
+                                                        "w-full pl-3 text-left font-normal",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {field.value ? (
+                                                        format(field.value, "PPP")
+                                                    ) : (
+                                                        <span>Pick a date</span>
+                                                    )}
+                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value ?? undefined}
+                                                onSelect={field.onChange}
+                                                disabled={(date) => date < new Date("1900-01-01")}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+                            <Button type="submit">Save</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 const LicenseManagementPage: NextPage = () => {
   const { data: session, status } = useSession();
@@ -325,43 +511,21 @@ const LicenseManagementPage: NextPage = () => {
     setPendingEditCell(null);
   };
 
-  const handleAddRow = useCallback(() => {
+  const handleAddRow = useCallback((newLicense: LicenseFormValues) => {
     if (isLoading || !isAdmin) return;
     setEditingCell(null);
-    const newRow: { [key: string]: any } = {};
-
-    LICENSE_MODEL_HEADERS.forEach(header => {
-        switch(header) {
-            case 'Numero_Licenze':
-            case 'Bundle':
-                newRow[header] = 0;
-                break;
-            case 'suppliers':
-            case 'rdas':
-                newRow[header] = [];
-                break;
-            case 'Scadenza':
-                newRow[header] = null;
-                break;
-            default:
-                newRow[header] = "";
-        }
-    });
     
-    let currentHeaders = [...tableHeaders];
-    if (currentHeaders.length === 0 || !LICENSE_MODEL_HEADERS.every(h => currentHeaders.includes(h))) {
-        const headersWithId = (tableData && tableData.length > 0 && tableData[0].hasOwnProperty('id'));
-        currentHeaders = [...LICENSE_MODEL_HEADERS];
-        if (headersWithId) {
-            currentHeaders.unshift('id');
-        }
-        setTableHeaders(currentHeaders);
-    }
-
+    const newRow = {
+        ...newLicense,
+        Scadenza: newLicense.Scadenza ? format(newLicense.Scadenza, 'yyyy-MM-dd') : null,
+        suppliers: [],
+        rdas: [],
+    };
+    
     setTableData(prevData => [...(prevData || []), newRow]);
-    setSuccessMessage("New row added. Click cells to edit. Save to persist changes to DB.");
+    setSuccessMessage("New row added. Save to persist changes to DB.");
     setError(null);
-  }, [isLoading, tableHeaders, tableData, isAdmin]);
+  }, [isLoading, isAdmin]);
 
   const handleNotify = useCallback(async () => {
     setIsNotifying(true);
@@ -515,16 +679,17 @@ const LicenseManagementPage: NextPage = () => {
                     <Save className="mr-2 h-5 w-5" />
                     Save to Database
                   </Button>
-                  <Button
-                    onClick={handleAddRow}
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
-                    aria-label="Add new row to table"
-                    disabled={isLoading || isNotifying}
-                  >
-                    <PlusCircle className="mr-2 h-5 w-5" />
-                    Add Row
-                  </Button>
+                  <AddLicenseDialog onSave={handleAddRow}>
+                      <Button
+                          variant="outline"
+                          className="border-primary text-primary hover:bg-primary/10 hover:text-primary rounded-md w-full md:w-auto"
+                          aria-label="Add new row to table"
+                          disabled={isLoading || isNotifying}
+                      >
+                          <PlusCircle className="mr-2 h-5 w-5" />
+                          Add Row
+                      </Button>
+                  </AddLicenseDialog>
                 </>
               )}
               <Button
@@ -726,3 +891,5 @@ const LicenseManagementPage: NextPage = () => {
 };
 
 export default LicenseManagementPage;
+
+    
